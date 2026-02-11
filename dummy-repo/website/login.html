@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Demo Website</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="login-container">
+        <h1>Login</h1>
+
+        <!-- VULNERABILITY: Form without HTTPS, no autocomplete="off" for sensitive fields -->
+        <!-- VULNERABILITY: Action points to HTTP endpoint -->
+        <form id="loginForm" action="http://api.example.com/login" method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <!-- VULNERABILITY: Password field without autocomplete="new-password" -->
+                <input type="password" id="password" name="password" required>
+            </div>
+
+            <div class="form-group">
+                <!-- VULNERABILITY: Storing sensitive data -->
+                <label>
+                    <input type="checkbox" id="rememberMe" name="rememberMe">
+                    Remember me
+                </label>
+            </div>
+
+            <button type="submit">Login</button>
+        </form>
+
+        <div id="loginError" class="error-message"></div>
+
+        <div class="links">
+            <a href="forgot-password.html">Forgot Password?</a>
+            <a href="register.html">Create Account</a>
+        </div>
+    </div>
+
+    <script>
+        // VULNERABILITY: Storing password in localStorage
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+            var rememberMe = document.getElementById('rememberMe').checked;
+
+            // SECURITY ISSUE: Storing credentials in localStorage
+            if (rememberMe) {
+                localStorage.setItem('username', username);
+                localStorage.setItem('password', password);  // CRITICAL VULNERABILITY
+            }
+
+            // VULNERABILITY: Sending credentials via GET parameters
+            var url = 'http://api.example.com/auth?user=' + username + '&pass=' + password;
+
+            // VULNERABILITY: Using XMLHttpRequest without proper error handling
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.send();
+
+            xhr.onload = function() {
+                if (xhr.status == 200) {
+                    // VULNERABILITY: innerHTML with response data
+                    document.getElementById('loginError').innerHTML = xhr.responseText;
+
+                    // VULNERABILITY: Storing token without HttpOnly flag consideration
+                    var token = JSON.parse(xhr.responseText).token;
+                    document.cookie = "auth_token=" + token;  // No Secure, HttpOnly flags
+
+                    window.location.href = 'dashboard.html';
+                }
+            };
+        });
+
+        // VULNERABILITY: Exposing debug information
+        console.log('Debug mode enabled');
+        console.log('Server: ' + window.location.hostname);
+
+        // VULNERABILITY: Checking for admin in client-side
+        function checkAdmin() {
+            var isAdmin = localStorage.getItem('isAdmin') === 'true';
+            if (isAdmin) {
+                document.body.innerHTML += '<a href="/admin">Admin Panel</a>';
+            }
+        }
+        checkAdmin();
+    </script>
+</body>
+</html>

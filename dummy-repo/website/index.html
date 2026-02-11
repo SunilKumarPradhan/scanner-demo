@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Website - SonarCloud Test</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- VULNERABILITY: Loading script from HTTP (mixed content) -->
+    <script src="http://example.com/oldlib.js"></script>
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">DemoSite</div>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="login.html">Login</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h1>Welcome to Demo Website</h1>
+            <p>This is a test website for SonarCloud scanning.</p>
+        </section>
+
+        <section class="search">
+            <h2>Search</h2>
+            <!-- VULNERABILITY: Vulnerable to DOM XSS -->
+            <input type="text" id="searchInput" placeholder="Search...">
+            <button onclick="performSearch()">Search</button>
+            <div id="searchResults"></div>
+        </section>
+
+        <section class="comments">
+            <h2>Comments</h2>
+            <!-- VULNERABILITY: No CSRF protection, vulnerable form -->
+            <form action="/api/comments" method="POST">
+                <input type="text" name="username" placeholder="Your name">
+                <textarea name="comment" placeholder="Your comment"></textarea>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="commentsList"></div>
+        </section>
+
+        <section class="user-content">
+            <h2>User Generated Content</h2>
+            <!-- VULNERABILITY: innerHTML with user data (XSS) -->
+            <div id="userContent"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Demo Website. For testing purposes only.</p>
+        <!-- VULNERABILITY: Inline event handler -->
+        <button onclick="alert('Contact us!')">Contact</button>
+    </footer>
+
+    <script src="app.js"></script>
+
+    <!-- VULNERABILITY: Inline script with sensitive logic -->
+    <script>
+        // SECURITY ISSUE: Hardcoded API key
+        var API_KEY = "sk_live_abc123secretkey456";
+        var DEBUG_MODE = true;
+
+        // VULNERABILITY: eval usage
+        function processData(data) {
+            eval("var result = " + data);
+            return result;
+        }
+
+        // VULNERABILITY: document.write usage
+        document.write("<p>Page loaded at: " + new Date() + "</p>");
+    </script>
+</body>
+</html>

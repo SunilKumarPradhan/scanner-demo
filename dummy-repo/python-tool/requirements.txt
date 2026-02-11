@@ -1,0 +1,80 @@
+# Python Dependencies
+# Contains intentionally outdated/vulnerable versions for SonarCloud testing
+
+# Web Framework
+# VULNERABILITY: Outdated Flask with known vulnerabilities
+flask==1.0.2
+
+# Database
+# VULNERABILITY: Old mysql-connector with security issues
+mysql-connector-python==8.0.11
+sqlite3
+
+# YAML parsing
+# VULNERABILITY: PyYAML with unsafe load
+pyyaml==5.1
+
+# HTTP client
+requests==2.20.0
+
+# Serialization
+# VULNERABILITY: Old pickle (core library, but included for reference)
+pickle5==0.0.9
+
+# Cryptography
+# VULNERABILITY: Outdated cryptography library
+cryptography==2.3
+
+# XML parsing (with XXE issues)
+lxml==4.2.1
+
+# Template engine
+jinja2==2.10
+
+# SQL toolkit
+# VULNERABILITY: Old SQLAlchemy
+sqlalchemy==1.2.0
+
+# Password hashing
+# Note: These are intentionally weak/outdated
+passlib==1.7.1
+
+# JWT handling
+# VULNERABILITY: Old PyJWT with known issues
+pyjwt==1.5.0
+
+# Input validation
+# VULNERABILITY: Old WTForms
+wtforms==2.2.0
+
+# File uploads
+# VULNERABILITY: Old Werkzeug
+werkzeug==0.14.1
+
+# Markdown parsing
+# VULNERABILITY: Old markdown library
+markdown==2.6.9
+
+# Image processing
+# VULNERABILITY: Old Pillow with security issues
+pillow==5.0.0
+
+# PDF generation
+# VULNERABILITY: Old reportlab
+reportlab==3.4.0
+
+# XML processing
+# VULNERABILITY: defusedxml would be safer
+xml==1.0.0
+
+# Testing
+pytest==3.0.0
+coverage==4.0
+
+# Development
+# VULNERABILITY: Debug toolbar in requirements
+flask-debugtoolbar==0.10.0
+
+# Outdated utilities
+urllib3==1.22
+paramiko==2.0.0
