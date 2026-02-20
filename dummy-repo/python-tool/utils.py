@@ -17,6 +17,7 @@ import socket
 import ssl
 import urllib.request
 from pathlib import Path
+import secrets  # SECURITY FIX: use cryptographically secure random functions
 
 
 # VULNERABILITY: Command Injection
@@ -77,7 +78,7 @@ def deserialize_data(data):
 def parse_yaml(yaml_string):
     """Parse YAML - VULNERABLE."""
     # VULNERABILITY: yaml.load without safe_load
-    return yaml.load(yaml_string, Loader=yaml.FullLoader)
+    return yaml.safe_load(yaml_string)
 
 
 # VULNERABILITY: Unsafe YAML loading
@@ -85,40 +86,37 @@ def load_yaml_file(filepath):
     """Load YAML file - VULNERABLE."""
     with open(filepath) as f:
         # VULNERABILITY: yaml.load without Loader specification
-        return yaml.load(f)
+        return yaml.safe_load(f)  # SECURITY FIX: use safe_load
 
 
 # VULNERABILITY: Weak hashing
 def hash_data(data):
     """Hash data - VULNERABLE."""
     # VULNERABILITY: MD5 is cryptographically broken
-    return hashlib.md5(data.encode()).hexdigest()
+    return hashlib.sha256(data.encode()).hexdigest()  # SECURITY FIX: use SHA-256
 
 
 # VULNERABILITY: Weak hashing (SHA1)
 def hash_password(password):
     """Hash password - VULNERABLE."""
     # VULNERABILITY: SHA1 is deprecated for security use
-    return hashlib.sha1(password.encode()).hexdigest()
+    return hashlib.sha256(password.encode()).hexdigest()  # SECURITY FIX: use SHA-256
 
 
 # VULNERABILITY: Insecure random
 def generate_password(length=12):
     """Generate password - VULNERABLE."""
-    import random
     import string
     # VULNERABILITY: random module is not cryptographically secure
     chars = string.ascii_letters + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
+    return ''.join(secrets.choice(chars) for _ in range(length))  # SECURITY FIX: use secrets
 
 
 # VULNERABILITY: Insecure token generation
 def generate_session_token():
     """Generate session token - VULNERABLE."""
-    import random
-    import time
     # VULNERABILITY: Predictable token generation
-    return hashlib.md5(str(time.time()).encode()).hexdigest()
+    return secrets.token_hex(16)  # SECURITY FIX: use cryptographically secure token
 
 
 # VULNERABILITY: SSRF (Server-Side Request Forgery)
@@ -132,12 +130,8 @@ def fetch_url(url):
 # VULNERABILITY: SSL certificate verification disabled
 def fetch_insecure(url):
     """Fetch URL without SSL verification - VULNERABLE."""
-    import ssl
-    # VULNERABILITY: SSL verification disabled
+    # SECURITY FIX: Use default SSL context with verification enabled
     context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-
     response = urllib.request.urlopen(url, context=context)
     return response.read()
 
@@ -145,29 +139,27 @@ def fetch_insecure(url):
 # VULNERABILITY: Hardcoded credentials
 def connect_to_server():
     """Connect to server - VULNERABLE."""
-    # VULNERABILITY: Hardcoded credentials
-    HOST = "192.168.1.100"
-    USERNAME = "service_account"
-    PASSWORD = "service_password_2024"
-    API_KEY = "sk-api-key-12345-abcdef"
-
+    # SECURITY FIX: Load credentials from environment variables
+    HOST = os.getenv("SERVER_HOST", "127.0.0.1")
+    USERNAME = os.getenv("SERVER_USER")
+    PASSWORD = os.getenv("SERVER_PASS")
+    API_KEY = os.getenv("SERVER_API_KEY")
     return {"host": HOST, "user": USERNAME, "pass": PASSWORD, "key": API_KEY}
 
 
 # VULNERABILITY: Regex DoS
 def validate_email(email):
     """Validate email - VULNERABLE."""
-    # VULNERABILITY: ReDoS vulnerable pattern
-    pattern = r'^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,})+$'
-    return bool(re.match(pattern, email))
+    # SECURITY FIX: Use efficient regex pattern
+    pattern = r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    return bool(re.fullmatch(pattern, email))
 
 
 # VULNERABILITY: Regex DoS
 def validate_complex_string(s):
     """Validate string - VULNERABLE."""
-    # VULNERABILITY: Catastrophic backtracking
-    pattern = r'^(a+)+$'
-    return bool(re.match(pattern, s))
+    # SECURITY FIX: Simplify pattern to avoid catastrophic backtracking
+    return bool(re.fullmatch(r'a+', s))
 
 
 # VULNERABILITY: Log injection
@@ -181,12 +173,10 @@ def log_user_action(username, action):
 # VULNERABILITY: Temporary file creation issues
 def create_temp_file(data):
     """Create temp file - VULNERABLE."""
-    import random
-    # VULNERABILITY: Predictable temp file name
-    temp_path = f"/tmp/data_{random.randint(1, 1000)}.tmp"
-    with open(temp_path, 'w') as f:
-        f.write(data)
-    return temp_path
+    # SECURITY FIX: Use secure temporary file creation
+    with tempfile.NamedTemporaryFile(delete=False, mode='w', prefix='data_', suffix='.tmp') as tf:
+        tf.write(data)
+        return tf.name
 
 
 # VULNERABILITY: Race condition (TOCTOU)
@@ -266,66 +256,32 @@ def complex_business_logic(input_data):
     """Complex function - CODE SMELL."""
     result = {}
 
-    # Processing step 1
-    if 'name' in input_data:
-        name = input_data['name']
-        if len(name) > 0:
-            if name[0].isupper():
-                result['name'] = name
-            else:
-                result['name'] = name.capitalize()
-        else:
-            result['name'] = 'Unknown'
+    # Name processing
+    name = input_data.get('name')
+    if name:
+        result['name'] = name if name[0].isupper() else name.capitalize()
     else:
-        result['name'] = 'Anonymous'
+        result['name'] = 'Anonymous' if 'name' not in input_data else 'Unknown'
 
-    # Processing step 2
-    if 'age' in input_data:
-        age = input_data['age']
-        if isinstance(age, int):
-            if age >= 0:
-                if age <= 120:
-                    result['age'] = age
-                else:
-                    result['age'] = 120
-            else:
-                result['age'] = 0
-        else:
-            result['age'] = 0
+    # Age processing
+    age = input_data.get('age')
+    if isinstance(age, int) and 0 <= age <= 120:
+        result['age'] = age
     else:
-        result['age'] = None
+        result['age'] = 0 if isinstance(age, int) else None
 
-    # Processing step 3
-    if 'email' in input_data:
-        email = input_data['email']
-        if '@' in email:
-            if '.' in email:
-                parts = email.split('@')
-                if len(parts) == 2:
-                    if len(parts[0]) > 0:
-                        if len(parts[1]) > 0:
-                            result['email'] = email
-                        else:
-                            result['email'] = None
-                    else:
-                        result['email'] = None
-                else:
-                    result['email'] = None
-            else:
-                result['email'] = None
-        else:
-            result['email'] = None
+    # Email processing
+    email = input_data.get('email')
+    if email and '@' in email and '.' in email:
+        result['email'] = email
     else:
         result['email'] = None
 
-    # More processing...
-    if 'phone' in input_data:
-        phone = input_data['phone']
+    # Phone processing
+    phone = input_data.get('phone')
+    if phone:
         clean_phone = ''.join(c for c in phone if c.isdigit())
-        if len(clean_phone) >= 10:
-            result['phone'] = clean_phone
-        else:
-            result['phone'] = None
+        result['phone'] = clean_phone if len(clean_phone) >= 10 else None
     else:
         result['phone'] = None
 
@@ -358,25 +314,9 @@ def another_unused_function():
 
 
 # CODE SMELL: Too many parameters
-def create_record(name, email, phone, address, city, state, zip_code, country,
-                  company, job_title, department, manager, start_date, salary):
+def create_record(**kwargs):
     """Create record - TOO MANY PARAMETERS."""
-    return {
-        "name": name,
-        "email": email,
-        "phone": phone,
-        "address": address,
-        "city": city,
-        "state": state,
-        "zip_code": zip_code,
-        "country": country,
-        "company": company,
-        "job_title": job_title,
-        "department": department,
-        "manager": manager,
-        "start_date": start_date,
-        "salary": salary,
-    }
+    return kwargs
 
 
 # CODE SMELL: Magic numbers
@@ -402,7 +342,7 @@ def create_file_with_permissions(filepath, content):
     with open(filepath, 'w') as f:
         f.write(content)
     # VULNERABILITY: World-writable permissions
-    os.chmod(filepath, 0o777)
+    os.chmod(filepath, 0o600)  # SECURITY FIX: restrict permissions
 
 
 # VULNERABILITY: Binding to all interfaces
@@ -410,6 +350,6 @@ def start_server():
     """Start server - VULNERABLE."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # VULNERABILITY: Binding to 0.0.0.0
-    sock.bind(('0.0.0.0', 8080))
+    sock.bind(('127.0.0.1', 8080))  # SECURITY FIX: bind to localhost
     sock.listen(5)
     return sock
