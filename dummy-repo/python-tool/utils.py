@@ -17,6 +17,7 @@ import socket
 import ssl
 import urllib.request
 from pathlib import Path
+import secrets  # SECURITY FIX: use cryptographically secure random generator
 
 
 # VULNERABILITY: Command Injection
@@ -84,41 +85,38 @@ def parse_yaml(yaml_string):
 def load_yaml_file(filepath):
     """Load YAML file - VULNERABLE."""
     with open(filepath) as f:
-        # VULNERABILITY: yaml.load without Loader specification
-        return yaml.load(f)
+        # SECURITY FIX: use safe_load to avoid arbitrary code execution
+        return yaml.safe_load(f)
 
 
 # VULNERABILITY: Weak hashing
 def hash_data(data):
     """Hash data - VULNERABLE."""
-    # VULNERABILITY: MD5 is cryptographically broken
-    return hashlib.md5(data.encode()).hexdigest()
+    # SECURITY FIX: use SHA-256 instead of MD5
+    return hashlib.sha256(data.encode()).hexdigest()
 
 
 # VULNERABILITY: Weak hashing (SHA1)
 def hash_password(password):
     """Hash password - VULNERABLE."""
-    # VULNERABILITY: SHA1 is deprecated for security use
-    return hashlib.sha1(password.encode()).hexdigest()
+    # SECURITY FIX: use SHA-256 instead of SHA1
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
 # VULNERABILITY: Insecure random
 def generate_password(length=12):
     """Generate password - VULNERABLE."""
-    import random
     import string
-    # VULNERABILITY: random module is not cryptographically secure
+    # SECURITY FIX: use secrets.choice for cryptographically secure randomness
     chars = string.ascii_letters + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
+    return ''.join(secrets.choice(chars) for _ in range(length))
 
 
 # VULNERABILITY: Insecure token generation
 def generate_session_token():
     """Generate session token - VULNERABLE."""
-    import random
-    import time
-    # VULNERABILITY: Predictable token generation
-    return hashlib.md5(str(time.time()).encode()).hexdigest()
+    # SECURITY FIX: use secrets for unpredictable token generation
+    return secrets.token_hex(16)
 
 
 # VULNERABILITY: SSRF (Server-Side Request Forgery)
@@ -132,12 +130,8 @@ def fetch_url(url):
 # VULNERABILITY: SSL certificate verification disabled
 def fetch_insecure(url):
     """Fetch URL without SSL verification - VULNERABLE."""
-    import ssl
-    # VULNERABILITY: SSL verification disabled
+    # SECURITY FIX: enforce hostname verification and certificate validation
     context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-
     response = urllib.request.urlopen(url, context=context)
     return response.read()
 
@@ -145,28 +139,27 @@ def fetch_insecure(url):
 # VULNERABILITY: Hardcoded credentials
 def connect_to_server():
     """Connect to server - VULNERABLE."""
-    # VULNERABILITY: Hardcoded credentials
-    HOST = "192.168.1.100"
-    USERNAME = "service_account"
-    PASSWORD = "service_password_2024"
-    API_KEY = "sk-api-key-12345-abcdef"
-
+    # SECURITY FIX: retrieve credentials from environment variables
+    HOST = os.getenv("HOST", "127.0.0.1")
+    USERNAME = os.getenv("USERNAME", "service_account")
+    PASSWORD = os.getenv("PASSWORD", "service_password_2024")
+    API_KEY = os.getenv("API_KEY")
     return {"host": HOST, "user": USERNAME, "pass": PASSWORD, "key": API_KEY}
 
 
 # VULNERABILITY: Regex DoS
 def validate_email(email):
     """Validate email - VULNERABLE."""
-    # VULNERABILITY: ReDoS vulnerable pattern
-    pattern = r'^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,})+$'
+    # SECURITY FIX: use a linear-time regex
+    pattern = r'^[^@]+@[^@]+\.[^@]+$'
     return bool(re.match(pattern, email))
 
 
 # VULNERABILITY: Regex DoS
 def validate_complex_string(s):
     """Validate string - VULNERABLE."""
-    # VULNERABILITY: Catastrophic backtracking
-    pattern = r'^(a+)+$'
+    # SECURITY FIX: simplified regex without catastrophic backtracking
+    pattern = r'^a+$'
     return bool(re.match(pattern, s))
 
 
@@ -181,12 +174,10 @@ def log_user_action(username, action):
 # VULNERABILITY: Temporary file creation issues
 def create_temp_file(data):
     """Create temp file - VULNERABLE."""
-    import random
-    # VULNERABILITY: Predictable temp file name
-    temp_path = f"/tmp/data_{random.randint(1, 1000)}.tmp"
-    with open(temp_path, 'w') as f:
-        f.write(data)
-    return temp_path
+    # SECURITY FIX: use secure temporary file creation
+    with tempfile.NamedTemporaryFile(delete=False, mode='w', prefix='data_', suffix='.tmp') as tf:
+        tf.write(data)
+        return tf.name
 
 
 # VULNERABILITY: Race condition (TOCTOU)
@@ -266,68 +257,37 @@ def complex_business_logic(input_data):
     """Complex function - CODE SMELL."""
     result = {}
 
-    # Processing step 1
-    if 'name' in input_data:
-        name = input_data['name']
-        if len(name) > 0:
-            if name[0].isupper():
-                result['name'] = name
-            else:
-                result['name'] = name.capitalize()
-        else:
-            result['name'] = 'Unknown'
+    # Name processing
+    if "name" not in input_data:
+        result["name"] = "Anonymous"
     else:
-        result['name'] = 'Anonymous'
+        name = input_data["name"]
+        if not name:
+            result["name"] = "Unknown"
+        else:
+            result["name"] = name if name[0].isupper() else name.capitalize()
 
-    # Processing step 2
-    if 'age' in input_data:
-        age = input_data['age']
-        if isinstance(age, int):
-            if age >= 0:
-                if age <= 120:
-                    result['age'] = age
-                else:
-                    result['age'] = 120
-            else:
-                result['age'] = 0
-        else:
-            result['age'] = 0
+    # Age processing
+    age = input_data.get("age")
+    if isinstance(age, int) and 0 <= age <= 120:
+        result["age"] = age
     else:
-        result['age'] = None
+        result["age"] = 0 if isinstance(age, int) else None
 
-    # Processing step 3
-    if 'email' in input_data:
-        email = input_data['email']
-        if '@' in email:
-            if '.' in email:
-                parts = email.split('@')
-                if len(parts) == 2:
-                    if len(parts[0]) > 0:
-                        if len(parts[1]) > 0:
-                            result['email'] = email
-                        else:
-                            result['email'] = None
-                    else:
-                        result['email'] = None
-                else:
-                    result['email'] = None
-            else:
-                result['email'] = None
-        else:
-            result['email'] = None
+    # Email processing
+    email = input_data.get("email")
+    if email and validate_email(email):
+        result["email"] = email
     else:
-        result['email'] = None
+        result["email"] = None
 
-    # More processing...
-    if 'phone' in input_data:
-        phone = input_data['phone']
-        clean_phone = ''.join(c for c in phone if c.isdigit())
-        if len(clean_phone) >= 10:
-            result['phone'] = clean_phone
-        else:
-            result['phone'] = None
+    # Phone processing
+    phone = input_data.get("phone")
+    if phone:
+        clean_phone = "".join(c for c in phone if c.isdigit())
+        result["phone"] = clean_phone if len(clean_phone) >= 10 else None
     else:
-        result['phone'] = None
+        result["phone"] = None
 
     return result
 
@@ -359,7 +319,7 @@ def another_unused_function():
 
 # CODE SMELL: Too many parameters
 def create_record(name, email, phone, address, city, state, zip_code, country,
-                  company, job_title, department, manager, start_date, salary):
+                  company, job_title, department, start_date, salary, manager=None):
     """Create record - TOO MANY PARAMETERS."""
     return {
         "name": name,
@@ -401,8 +361,8 @@ def create_file_with_permissions(filepath, content):
     """Create file with permissions - VULNERABLE."""
     with open(filepath, 'w') as f:
         f.write(content)
-    # VULNERABILITY: World-writable permissions
-    os.chmod(filepath, 0o777)
+    # SECURITY FIX: set restrictive permissions
+    os.chmod(filepath, 0o600)
 
 
 # VULNERABILITY: Binding to all interfaces

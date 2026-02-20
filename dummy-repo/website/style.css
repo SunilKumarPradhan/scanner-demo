@@ -14,7 +14,7 @@
 body {
     font-family: Arial, sans-serif !important;
     line-height: 1.6 !important;
-    color: #333 !important;
+    color: #222; /* SECURITY FIX: Improved contrast against background */
     background-color: #f4f4f4 !important;
 }
 
@@ -23,13 +23,12 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
-    max-width: 1200px; /* Duplicate */
 }
 
 /* Header Styles */
 header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    color: #000; /* SECURITY FIX: Sufficient contrast with background */
     padding: 1rem 0;
     position: fixed;
     width: 100%;
@@ -73,7 +72,7 @@ nav a:hover {
 /* Hero Section */
 .hero {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    color: #000; /* SECURITY FIX: Sufficient contrast with background */
     padding: 8rem 0 4rem;
     text-align: center;
     min-height: 100vh;
@@ -96,7 +95,7 @@ nav a:hover {
 #main-cta-button {
     display: inline-block;
     background: white;
-    color: #667eea;
+    color: #000; /* SECURITY FIX: Improved contrast */
     padding: 1rem 2rem;
     border-radius: 50px;
     text-decoration: none;
@@ -128,12 +127,14 @@ nav a:hover {
     gap: 2rem;
 }
 
+/* Merged duplicate selector and added border */
 .feature-card {
     background: #f8f9fa;
     padding: 2rem;
     border-radius: 10px;
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid #eee; /* SECURITY FIX: Consolidated duplicate selector */
 }
 
 .feature-card:hover {
@@ -185,7 +186,7 @@ nav a:hover {
 .search-box button {
     padding: 1rem 2rem;
     background: #667eea;
-    color: white;
+    color: #000; /* SECURITY FIX: Improved contrast */
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -305,7 +306,7 @@ nav a:hover {
 }
 
 .login-links a {
-    color: #667eea;
+    color: #000; /* SECURITY FIX: Improved contrast */
     text-decoration: none;
 }
 
@@ -361,15 +362,6 @@ footer p {
     opacity: 0.8;
 }
 
-/* CODE SMELL: Empty rule */
-.unused-class {
-}
-
-/* CODE SMELL: Duplicate selector */
-.feature-card {
-    border: 1px solid #eee;
-}
-
 /* Utility Classes */
 /* CODE SMELL: Too many similar utility classes */
 .mt-1 { margin-top: 0.25rem !important; }
@@ -420,14 +412,6 @@ footer p {
         flex-direction: column;
     }
 }
-
-/* CODE SMELL: Commented out code */
-/*
-.old-feature {
-    display: none;
-    background: red;
-}
-*/
 
 /* CODE SMELL: Magic numbers */
 .custom-spacing {

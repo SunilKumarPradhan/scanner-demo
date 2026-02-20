@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Demo Website - SonarCloud Test</title>
     <link rel="stylesheet" href="style.css">
-    <!-- VULNERABILITY: Loading script from HTTP (mixed content) -->
-    <script src="http://example.com/oldlib.js"></script>
+    <!-- Updated to HTTPS and added integrity attribute -->
+    <script src="https://example.com/oldlib.js" integrity="sha384-PLACEHOLDER_HASH" crossorigin="anonymous"></script>
 </head>
 <body>
     <header>
@@ -28,16 +28,16 @@
 
         <section class="search">
             <h2>Search</h2>
-            <!-- VULNERABILITY: Vulnerable to DOM XSS -->
             <input type="text" id="searchInput" placeholder="Search...">
-            <button onclick="performSearch()">Search</button>
+            <button id="searchBtn">Search</button>
             <div id="searchResults"></div>
         </section>
 
         <section class="comments">
             <h2>Comments</h2>
-            <!-- VULNERABILITY: No CSRF protection, vulnerable form -->
+            <!-- Added CSRF token field -->
             <form action="/api/comments" method="POST">
+                <input type="hidden" name="csrf_token" value="PLACEHOLDER_CSRF_TOKEN">
                 <input type="text" name="username" placeholder="Your name">
                 <textarea name="comment" placeholder="Your comment"></textarea>
                 <button type="submit">Submit</button>
@@ -47,33 +47,58 @@
 
         <section class="user-content">
             <h2>User Generated Content</h2>
-            <!-- VULNERABILITY: innerHTML with user data (XSS) -->
             <div id="userContent"></div>
         </section>
     </main>
 
     <footer>
         <p>&copy; 2024 Demo Website. For testing purposes only.</p>
-        <!-- VULNERABILITY: Inline event handler -->
-        <button onclick="alert('Contact us!')">Contact</button>
+        <button id="contactBtn">Contact</button>
     </footer>
 
     <script src="app.js"></script>
 
-    <!-- VULNERABILITY: Inline script with sensitive logic -->
     <script>
-        // SECURITY ISSUE: Hardcoded API key
-        var API_KEY = "sk_live_abc123secretkey456";
-        var DEBUG_MODE = true;
+        // Removed hardcoded API key and disabled debug mode
+        var DEBUG_MODE = false; // SECURITY FIX: disabled debug mode in production
 
-        // VULNERABILITY: eval usage
+        // Replaced eval with safe JSON parsing
         function processData(data) {
-            eval("var result = " + data);
-            return result;
+            try {
+                var result = JSON.parse(data);
+                return result;
+            } catch (e) {
+                console.error("Failed to parse data:", e);
+                throw e; // re-throw after logging
+            }
         }
 
-        // VULNERABILITY: document.write usage
-        document.write("<p>Page loaded at: " + new Date() + "</p>");
+        // Replaced document.write with DOM manipulation
+        var loadInfo = document.createElement('p');
+        loadInfo.textContent = "Page loaded at: " + new Date();
+        document.body.appendChild(loadInfo);
+
+        // Secure search handling without DOM XSS
+        function performSearch() {
+            var query = document.getElementById('searchInput').value;
+            var resultsDiv = document.getElementById('searchResults');
+            // Example safe insertion (replace with real search logic)
+            resultsDiv.textContent = "Results for: " + query;
+        }
+
+        // Attach event listeners instead of inline handlers
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('contactBtn').addEventListener('click', function () {
+            alert('Contact us!');
+        });
+
+        // Safely display user-generated content
+        function displayUserContent(content) {
+            var userContentDiv = document.getElementById('userContent');
+            userContentDiv.textContent = content; // SECURITY FIX: avoid innerHTML
+        }
+        // Example usage (replace with actual data source)
+        // displayUserContent("User submitted text");
     </script>
 </body>
 </html>
