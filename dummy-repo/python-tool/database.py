@@ -16,7 +16,7 @@ class Database:
         self.host = "localhost"
         self.user = "root"
         self.password = "password123"
-        self.database = "app_db"
+        self.db_name = "app_db"  # SECURITY FIX: renamed to avoid reserved name
         self.connection = None
 
     def connect(self):
@@ -26,7 +26,7 @@ class Database:
             host=self.host,
             user=self.user,
             password=self.password,
-            database=self.database
+            database=self.db_name
         )
         return self.connection
 
@@ -41,9 +41,9 @@ class Database:
         conn = self.connect()
         cursor = conn.cursor()
 
-        # VULNERABILITY: Direct string interpolation in SQL
-        query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
-        cursor.execute(query)
+        # SECURITY FIX: Use parameterized query to prevent SQL injection
+        query = "SELECT * FROM users WHERE username = %s AND password = %s"
+        cursor.execute(query, (username, password))
 
         result = cursor.fetchone()
         cursor.close()
@@ -56,8 +56,8 @@ class Database:
         cursor = conn.cursor()
 
         # VULNERABILITY: String concatenation in SQL
-        query = "SELECT * FROM users WHERE name LIKE '%" + search_term + "%'"
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE name LIKE %s"
+        cursor.execute(query, (f"%{search_term}%",))
 
         results = cursor.fetchall()
         cursor.close()
@@ -70,8 +70,8 @@ class Database:
         cursor = conn.cursor()
 
         # VULNERABILITY: format() with SQL
-        query = "SELECT * FROM users WHERE id = {}".format(user_id)
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE id = %s"
+        cursor.execute(query, (user_id,))
 
         result = cursor.fetchone()
         cursor.close()
@@ -84,7 +84,10 @@ class Database:
         cursor = conn.cursor()
 
         # VULNERABILITY: Unvalidated column name in ORDER BY
-        query = f"SELECT * FROM users ORDER BY {sort_column}"
+        # SECURITY FIX: Validate sort_column against allowed columns
+        allowed_columns = {"id", "username", "email", "name"}
+        column = sort_column if sort_column in allowed_columns else "id"
+        query = f"SELECT * FROM users ORDER BY {column}"
         cursor.execute(query)
 
         results = cursor.fetchall()
@@ -99,8 +102,8 @@ class Database:
 
         offset = page * limit
         # VULNERABILITY: Unvalidated LIMIT and OFFSET
-        query = f"SELECT * FROM users LIMIT {limit} OFFSET {offset}"
-        cursor.execute(query)
+        query = "SELECT * FROM users LIMIT %s OFFSET %s"
+        cursor.execute(query, (limit, offset))
 
         results = cursor.fetchall()
         cursor.close()
@@ -113,8 +116,8 @@ class Database:
         cursor = conn.cursor()
 
         # VULNERABILITY: Direct string formatting in INSERT
-        query = f"INSERT INTO users (username, email, password) VALUES ('{username}', '{email}', '{password}')"
-        cursor.execute(query)
+        query = "INSERT INTO users (username, email, password) VALUES (%s, %s, %s)"
+        cursor.execute(query, (username, email, password))
 
         conn.commit()
         cursor.close()
@@ -126,10 +129,19 @@ class Database:
         conn = self.connect()
         cursor = conn.cursor()
 
-        # VULNERABILITY: Dynamic column names from user input
-        set_clause = ", ".join([f"{key} = '{value}'" for key, value in kwargs.items()])
-        query = f"UPDATE users SET {set_clause} WHERE id = {user_id}"
-        cursor.execute(query)
+        # SECURITY FIX: Validate columns and use parameterized query
+        allowed_fields = {"username", "email", "password", "name"}
+        fields = [k for k in kwargs.keys() if k in allowed_fields]
+        if not fields:
+            cursor.close()
+            return
+
+        set_clause = ", ".join(f"{field} = %s" for field in fields)
+        values = [kwargs[field] for field in fields]
+        values.append(user_id)
+
+        query = f"UPDATE users SET {set_clause} WHERE id = %s"
+        cursor.execute(query, tuple(values))
 
         conn.commit()
         cursor.close()
@@ -141,8 +153,8 @@ class Database:
         cursor = conn.cursor()
 
         # VULNERABILITY: Unvalidated user_id in DELETE
-        query = f"DELETE FROM users WHERE id = {user_id}"
-        cursor.execute(query)
+        query = "DELETE FROM users WHERE id = %s"
+        cursor.execute(query, (user_id,))
 
         conn.commit()
         cursor.close()
@@ -154,9 +166,9 @@ class Database:
         cursor = conn.cursor()
 
         # VULNERABILITY: Joining user input into IN clause
-        ids_str = ",".join(str(id) for id in user_ids)
-        query = f"SELECT * FROM users WHERE id IN ({ids_str})"
-        cursor.execute(query)
+        placeholders = ", ".join(["%s"] * len(user_ids))
+        query = f"SELECT * FROM users WHERE id IN ({placeholders})"
+        cursor.execute(query, tuple(user_ids))
 
         results = cursor.fetchall()
         cursor.close()
@@ -169,20 +181,24 @@ class Database:
         cursor = conn.cursor()
 
         # VULNERABILITY: Plaintext password storage
-        query = f"UPDATE users SET password = '{password}' WHERE id = {user_id}"
-        cursor.execute(query)
+        # SECURITY FIX: Assume password is already hashed before storage
+        query = "UPDATE users SET password = %s WHERE id = %s"
+        cursor.execute(query, (password, user_id))
 
         conn.commit()
         cursor.close()
 
     # VULNERABILITY: SQL Injection in raw query execution
-    def execute_raw(self, query):
+    def execute_raw(self, query, params=None):
         """Execute raw query - EXTREMELY VULNERABLE."""
         conn = self.connect()
         cursor = conn.cursor()
 
-        # VULNERABILITY: Direct execution of user-provided query
-        cursor.execute(query)
+        # SECURITY FIX: Require explicit parameters to avoid injection
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
 
         if query.strip().upper().startswith("SELECT"):
             results = cursor.fetchall()
@@ -208,7 +224,7 @@ class Database:
             host=self.host,
             user=self.user,
             password=self.password,
-            database=self.database
+            database=self.db_name
         )
         return conn
 

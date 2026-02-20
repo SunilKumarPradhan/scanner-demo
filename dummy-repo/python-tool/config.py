@@ -18,7 +18,7 @@ class Config:
     DB_PASSWORD = "SuperSecretPassword123!"
 
     # VULNERABILITY: Hardcoded API keys
-    API_KEY = "sk-prod-api-key-1234567890abcdef"
+    API_KEY = os.getenv("API_KEY")  # SECURITY FIX: load API key from environment
     API_SECRET = "api-secret-xyz-987654321"
 
     # VULNERABILITY: Hardcoded AWS credentials
@@ -42,7 +42,7 @@ class Config:
     SMTP_HOST = "smtp.gmail.com"
     SMTP_PORT = 587
     SMTP_USER = "notifications@company.com"
-    SMTP_PASSWORD = "EmailPassword123!"
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")  # SECURITY FIX: load SMTP password from environment
 
     # VULNERABILITY: Hardcoded payment gateway credentials
     STRIPE_SECRET_KEY = "sk_live_51ABC123DEF456GHI789JKL"
@@ -51,11 +51,7 @@ class Config:
     PAYPAL_CLIENT_SECRET = "EHj9876543210zyxwvutsrqponmlkjihgfed"
 
     # VULNERABILITY: Hardcoded SSH key (partial)
-    SSH_PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB5mCFv+3qYsRRtZCAm
-FakePrivateKeyForTestingPurposesOnlyDoNotUseInProduction1234567890
-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
------END RSA PRIVATE KEY-----"""
+    SSH_PRIVATE_KEY = os.getenv("SSH_PRIVATE_KEY")  # SECURITY FIX: load SSH private key from environment
 
     # VULNERABILITY: Hardcoded admin credentials
     ADMIN_USERNAME = "superadmin"
@@ -103,10 +99,13 @@ FakeKeyDataForTestingOnly
 
 
 # VULNERABILITY: Hardcoded connection strings
-DATABASE_URL = "postgresql://admin:password123@prod-db.example.com:5432/myapp"
-REDIS_URL = "redis://:redis_password@cache.example.com:6379/0"
+DATABASE_URL = os.getenv("DATABASE_URL")  # SECURITY FIX: load from environment
+REDIS_URL = os.getenv("REDIS_URL")  # SECURITY FIX: load from environment
 MONGODB_URI = "mongodb://dbuser:dbpass123@mongo.example.com:27017/appdb"
-ELASTICSEARCH_URL = "http://elastic:changeme@es.example.com:9200"
+ELASTICSEARCH_URL = os.getenv(
+    "ELASTICSEARCH_URL",
+    "https://elastic:changeme@es.example.com:9200"
+)  # SECURITY FIX: use HTTPS by default
 
 # VULNERABILITY: Hardcoded API endpoints with credentials
 INTERNAL_API_URL = "https://admin:secret@internal-api.company.com/v1"
@@ -129,7 +128,7 @@ class ProductionConfig(Config):
     DEBUG = True
 
     # VULNERABILITY: Same hardcoded credentials
-    DB_PASSWORD = "ProductionPassword456!"
+    DB_PASSWORD = os.getenv("PROD_DB_PASSWORD")  # SECURITY FIX: load from environment
 
 
 # VULNERABILITY: Credentials in environment variable defaults
