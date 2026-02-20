@@ -18,7 +18,7 @@ class Config:
     DB_PASSWORD = "SuperSecretPassword123!"
 
     # VULNERABILITY: Hardcoded API keys
-    API_KEY = "sk-prod-api-key-1234567890abcdef"
+    API_KEY = os.getenv("API_KEY")  # SECURITY FIX: moved API key to environment variable
     API_SECRET = "api-secret-xyz-987654321"
 
     # VULNERABILITY: Hardcoded AWS credentials
@@ -51,15 +51,11 @@ class Config:
     PAYPAL_CLIENT_SECRET = "EHj9876543210zyxwvutsrqponmlkjihgfed"
 
     # VULNERABILITY: Hardcoded SSH key (partial)
-    SSH_PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB5mCFv+3qYsRRtZCAm
-FakePrivateKeyForTestingPurposesOnlyDoNotUseInProduction1234567890
-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
------END RSA PRIVATE KEY-----"""
+    SSH_PRIVATE_KEY = os.getenv("SSH_PRIVATE_KEY")  # SECURITY FIX: load SSH private key from environment
 
     # VULNERABILITY: Hardcoded admin credentials
     ADMIN_USERNAME = "superadmin"
-    ADMIN_PASSWORD = "Admin@123456"
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")  # SECURITY FIX: moved admin password to environment variable
 
     # VULNERABILITY: Hardcoded service account
     SERVICE_ACCOUNT_USER = "service_worker"
@@ -103,13 +99,14 @@ FakeKeyDataForTestingOnly
 
 
 # VULNERABILITY: Hardcoded connection strings
-DATABASE_URL = "postgresql://admin:password123@prod-db.example.com:5432/myapp"
+DATABASE_URL = os.getenv("DATABASE_URL")  # SECURITY FIX: load from environment
 REDIS_URL = "redis://:redis_password@cache.example.com:6379/0"
 MONGODB_URI = "mongodb://dbuser:dbpass123@mongo.example.com:27017/appdb"
-ELASTICSEARCH_URL = "http://elastic:changeme@es.example.com:9200"
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL")  # SECURITY FIX: load from environment (use HTTPS)
+
 
 # VULNERABILITY: Hardcoded API endpoints with credentials
-INTERNAL_API_URL = "https://admin:secret@internal-api.company.com/v1"
+INTERNAL_API_URL = os.getenv("INTERNAL_API_URL")  # SECURITY FIX: load from environment
 
 
 # VULNERABILITY: Insecure defaults
@@ -129,7 +126,7 @@ class ProductionConfig(Config):
     DEBUG = True
 
     # VULNERABILITY: Same hardcoded credentials
-    DB_PASSWORD = "ProductionPassword456!"
+    DB_PASSWORD = os.getenv("PROD_DB_PASSWORD")  # SECURITY FIX: load production DB password from environment
 
 
 # VULNERABILITY: Credentials in environment variable defaults
