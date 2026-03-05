@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Demo Website - SonarCloud Test</title>
     <link rel="stylesheet" href="style.css">
-    <!-- VULNERABILITY: Loading script from HTTP (mixed content) -->
-    <script src="http://example.com/oldlib.js"></script>
+    <!-- SECURITY FIX: Use HTTPS for external script -->
+    <script src="https://example.com/oldlib.js"></script>
 </head>
 <body>
     <header>
@@ -28,16 +28,17 @@
 
         <section class="search">
             <h2>Search</h2>
-            <!-- VULNERABILITY: Vulnerable to DOM XSS -->
+            <!-- SECURITY FIX: Sanitize input to prevent DOM XSS -->
             <input type="text" id="searchInput" placeholder="Search...">
-            <button onclick="performSearch()">Search</button>
+            <button id="searchButton">Search</button>
             <div id="searchResults"></div>
         </section>
 
         <section class="comments">
             <h2>Comments</h2>
-            <!-- VULNERABILITY: No CSRF protection, vulnerable form -->
+            <!-- SECURITY FIX: Add CSRF token -->
             <form action="/api/comments" method="POST">
+                <input type="hidden" name="csrf_token" id="csrf_token">
                 <input type="text" name="username" placeholder="Your name">
                 <textarea name="comment" placeholder="Your comment"></textarea>
                 <button type="submit">Submit</button>
@@ -47,33 +48,40 @@
 
         <section class="user-content">
             <h2>User Generated Content</h2>
-            <!-- VULNERABILITY: innerHTML with user data (XSS) -->
+            <!-- SECURITY FIX: Use textContent instead of innerHTML -->
             <div id="userContent"></div>
         </section>
     </main>
 
     <footer>
         <p>&copy; 2024 Demo Website. For testing purposes only.</p>
-        <!-- VULNERABILITY: Inline event handler -->
-        <button onclick="alert('Contact us!')">Contact</button>
+        <!-- SECURITY FIX: Remove inline event handler -->
+        <button id="contactButton">Contact</button>
     </footer>
 
     <script src="app.js"></script>
 
-    <!-- VULNERABILITY: Inline script with sensitive logic -->
     <script>
-        // SECURITY ISSUE: Hardcoded API key
-        var API_KEY = "sk_live_abc123secretkey456";
-        var DEBUG_MODE = true;
+        // SECURITY FIX: Remove hardcoded API key
+        const API_KEY = null;
+        const DEBUG_MODE = false;
 
-        // VULNERABILITY: eval usage
+        // SECURITY FIX: Remove eval usage
         function processData(data) {
-            eval("var result = " + data);
-            return result;
+            try {
+                return JSON.parse(data);
+            } catch (error) {
+                console.error('Error parsing data:', error);
+                return null;
+            }
         }
 
-        // VULNERABILITY: document.write usage
-        document.write("<p>Page loaded at: " + new Date() + "</p>");
+        // SECURITY FIX: Remove document.write
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadTimeElement = document.createElement('p');
+            loadTimeElement.textContent = `Page loaded at: ${new Date()}`;
+            document.body.appendChild(loadTimeElement);
+        });
     </script>
 </body>
 </html>
