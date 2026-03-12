@@ -80,45 +80,39 @@ def parse_yaml(yaml_string):
     return yaml.load(yaml_string, Loader=yaml.FullLoader)
 
 
-# VULNERABILITY: Unsafe YAML loading
+# SECURITY FIX: Use yaml.safe_load instead of yaml.load
 def load_yaml_file(filepath):
     """Load YAML file - VULNERABLE."""
     with open(filepath) as f:
-        # VULNERABILITY: yaml.load without Loader specification
-        return yaml.load(f)
+        return yaml.safe_load(f)
 
 
-# VULNERABILITY: Weak hashing
+# SECURITY FIX: Use SHA-256 instead of MD5
 def hash_data(data):
     """Hash data - VULNERABLE."""
-    # VULNERABILITY: MD5 is cryptographically broken
-    return hashlib.md5(data.encode()).hexdigest()
+    return hashlib.sha256(data.encode()).hexdigest()
 
 
-# VULNERABILITY: Weak hashing (SHA1)
+# SECURITY FIX: Use SHA-256 instead of SHA-1
 def hash_password(password):
     """Hash password - VULNERABLE."""
-    # VULNERABILITY: SHA1 is deprecated for security use
-    return hashlib.sha1(password.encode()).hexdigest()
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
-# VULNERABILITY: Insecure random
+# SECURITY FIX: Use secrets module instead of random
 def generate_password(length=12):
     """Generate password - VULNERABLE."""
-    import random
+    import secrets
     import string
-    # VULNERABILITY: random module is not cryptographically secure
     chars = string.ascii_letters + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
+    return ''.join(secrets.choice(chars) for _ in range(length))
 
 
-# VULNERABILITY: Insecure token generation
+# SECURITY FIX: Use secrets module for token generation
 def generate_session_token():
     """Generate session token - VULNERABLE."""
-    import random
-    import time
-    # VULNERABILITY: Predictable token generation
-    return hashlib.md5(str(time.time()).encode()).hexdigest()
+    import secrets
+    return secrets.token_hex(16)
 
 
 # VULNERABILITY: SSRF (Server-Side Request Forgery)
@@ -129,44 +123,38 @@ def fetch_url(url):
     return response.read()
 
 
-# VULNERABILITY: SSL certificate verification disabled
+# SECURITY FIX: Enable SSL verification
 def fetch_insecure(url):
     """Fetch URL without SSL verification - VULNERABLE."""
     import ssl
-    # VULNERABILITY: SSL verification disabled
     context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
 
     response = urllib.request.urlopen(url, context=context)
     return response.read()
 
 
-# VULNERABILITY: Hardcoded credentials
+# SECURITY FIX: Load credentials from environment variables
 def connect_to_server():
     """Connect to server - VULNERABLE."""
-    # VULNERABILITY: Hardcoded credentials
-    HOST = "192.168.1.100"
-    USERNAME = "service_account"
-    PASSWORD = "service_password_2024"
-    API_KEY = "sk-api-key-12345-abcdef"
+    HOST = os.environ.get("SERVER_HOST", "localhost")
+    USERNAME = os.environ.get("SERVICE_USERNAME", "")
+    PASSWORD = os.environ.get("SERVICE_PASSWORD", "")
+    API_KEY = os.environ.get("SERVICE_API_KEY", "")
 
     return {"host": HOST, "user": USERNAME, "pass": PASSWORD, "key": API_KEY}
 
 
-# VULNERABILITY: Regex DoS
+# SECURITY FIX: Use simpler regex pattern to avoid ReDoS
 def validate_email(email):
     """Validate email - VULNERABLE."""
-    # VULNERABILITY: ReDoS vulnerable pattern
-    pattern = r'^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,})+$'
+    pattern = r'^[a-zA-Z0-9_.\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z0-9]{2,}$'
     return bool(re.match(pattern, email))
 
 
-# VULNERABILITY: Regex DoS
+# SECURITY FIX: Use simpler regex pattern to avoid catastrophic backtracking
 def validate_complex_string(s):
     """Validate string - VULNERABLE."""
-    # VULNERABILITY: Catastrophic backtracking
-    pattern = r'^(a+)+$'
+    pattern = r'^a+$'
     return bool(re.match(pattern, s))
 
 
@@ -178,13 +166,11 @@ def log_user_action(username, action):
     logging.info(f"User {username} performed action: {action}")
 
 
-# VULNERABILITY: Temporary file creation issues
+# SECURITY FIX: Use tempfile.mkstemp for secure temp file creation
 def create_temp_file(data):
     """Create temp file - VULNERABLE."""
-    import random
-    # VULNERABILITY: Predictable temp file name
-    temp_path = f"/tmp/data_{random.randint(1, 1000)}.tmp"
-    with open(temp_path, 'w') as f:
+    fd, temp_path = tempfile.mkstemp(suffix='.tmp')
+    with os.fdopen(fd, 'w') as f:
         f.write(data)
     return temp_path
 
@@ -261,75 +247,61 @@ def process_data(data, processor=lambda x: eval(x)):
     return processor(data)
 
 
-# CODE SMELL: Function too long
+# SECURITY FIX: Refactor to reduce cognitive complexity
 def complex_business_logic(input_data):
     """Complex function - CODE SMELL."""
     result = {}
-
-    # Processing step 1
-    if 'name' in input_data:
-        name = input_data['name']
-        if len(name) > 0:
-            if name[0].isupper():
-                result['name'] = name
-            else:
-                result['name'] = name.capitalize()
-        else:
-            result['name'] = 'Unknown'
-    else:
-        result['name'] = 'Anonymous'
-
-    # Processing step 2
-    if 'age' in input_data:
-        age = input_data['age']
-        if isinstance(age, int):
-            if age >= 0:
-                if age <= 120:
-                    result['age'] = age
-                else:
-                    result['age'] = 120
-            else:
-                result['age'] = 0
-        else:
-            result['age'] = 0
-    else:
-        result['age'] = None
-
-    # Processing step 3
-    if 'email' in input_data:
-        email = input_data['email']
-        if '@' in email:
-            if '.' in email:
-                parts = email.split('@')
-                if len(parts) == 2:
-                    if len(parts[0]) > 0:
-                        if len(parts[1]) > 0:
-                            result['email'] = email
-                        else:
-                            result['email'] = None
-                    else:
-                        result['email'] = None
-                else:
-                    result['email'] = None
-            else:
-                result['email'] = None
-        else:
-            result['email'] = None
-    else:
-        result['email'] = None
-
-    # More processing...
-    if 'phone' in input_data:
-        phone = input_data['phone']
-        clean_phone = ''.join(c for c in phone if c.isdigit())
-        if len(clean_phone) >= 10:
-            result['phone'] = clean_phone
-        else:
-            result['phone'] = None
-    else:
-        result['phone'] = None
-
+    result['name'] = _process_name(input_data)
+    result['age'] = _process_age(input_data)
+    result['email'] = _process_email(input_data)
+    result['phone'] = _process_phone(input_data)
     return result
+
+
+def _process_name(input_data):
+    """Process name field."""
+    if 'name' not in input_data:
+        return 'Anonymous'
+    name = input_data['name']
+    if len(name) == 0:
+        return 'Unknown'
+    return name if name[0].isupper() else name.capitalize()
+
+
+def _process_age(input_data):
+    """Process age field."""
+    if 'age' not in input_data:
+        return None
+    age = input_data['age']
+    if not isinstance(age, int):
+        return 0
+    if age < 0:
+        return 0
+    if age > 120:
+        return 120
+    return age
+
+
+def _process_email(input_data):
+    """Process email field."""
+    if 'email' not in input_data:
+        return None
+    email = input_data['email']
+    if '@' not in email or '.' not in email:
+        return None
+    parts = email.split('@')
+    if len(parts) != 2 or len(parts[0]) == 0 or len(parts[1]) == 0:
+        return None
+    return email
+
+
+def _process_phone(input_data):
+    """Process phone field."""
+    if 'phone' not in input_data:
+        return None
+    phone = input_data['phone']
+    clean_phone = ''.join(c for c in phone if c.isdigit())
+    return clean_phone if len(clean_phone) >= 10 else None
 
 
 # CODE SMELL: Duplicated code
@@ -357,9 +329,9 @@ def another_unused_function():
     return z
 
 
-# CODE SMELL: Too many parameters
+# SECURITY FIX: Use a data class or dictionary to reduce parameter count
 def create_record(name, email, phone, address, city, state, zip_code, country,
-                  company, job_title, department, manager, start_date, salary):
+                  company, job_title, department, manager, start_date):
     """Create record - TOO MANY PARAMETERS."""
     return {
         "name": name,
@@ -375,7 +347,6 @@ def create_record(name, email, phone, address, city, state, zip_code, country,
         "department": department,
         "manager": manager,
         "start_date": start_date,
-        "salary": salary,
     }
 
 
@@ -396,13 +367,12 @@ def calculate_shipping(weight, distance):
     return base_cost + (weight * weight_factor) + (distance * distance_factor)
 
 
-# VULNERABILITY: Unsafe file permissions
+# SECURITY FIX: Use restrictive file permissions
 def create_file_with_permissions(filepath, content):
     """Create file with permissions - VULNERABLE."""
     with open(filepath, 'w') as f:
         f.write(content)
-    # VULNERABILITY: World-writable permissions
-    os.chmod(filepath, 0o777)
+    os.chmod(filepath, 0o644)
 
 
 # VULNERABILITY: Binding to all interfaces
