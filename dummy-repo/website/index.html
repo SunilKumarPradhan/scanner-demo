@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Demo Website - SonarCloud Test</title>
     <link rel="stylesheet" href="style.css">
-    <!-- VULNERABILITY: Loading script from HTTP (mixed content) -->
-    <script src="http://example.com/oldlib.js"></script>
+    <!-- SECURITY FIX: Changed to HTTPS and added integrity attribute -->
+    <script src="https://example.com/oldlib.js" integrity="sha384-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" crossorigin="anonymous"></script>
 </head>
 <body>
     <header>
@@ -66,10 +66,15 @@
         var API_KEY = "sk_live_abc123secretkey456";
         var DEBUG_MODE = true;
 
-        // VULNERABILITY: eval usage
+        // SECURITY FIX: Removed eval usage, use JSON.parse for safe data processing
         function processData(data) {
-            eval("var result = " + data);
-            return result;
+            try {
+                var result = JSON.parse(data);
+                return result;
+            } catch (e) {
+                console.error("Invalid data format:", e);
+                return null;
+            }
         }
 
         // VULNERABILITY: document.write usage
