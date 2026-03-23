@@ -17,8 +17,8 @@ from utils import execute_command, read_file
 
 app = Flask(__name__)
 
-# VULNERABILITY: Debug mode enabled in production
-app.debug = True
+# SECURITY FIX: Debug mode disabled in production
+app.debug = False
 
 # VULNERABILITY: Hardcoded secret key
 app.secret_key = "super_secret_key_123456789"
@@ -308,5 +308,5 @@ def send_password_email(email, password):
 
 # Entry point
 if __name__ == '__main__':
-    # VULNERABILITY: Binding to all interfaces
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # SECURITY FIX: Bind to localhost only in production
+    app.run(host='127.0.0.1', port=5000, debug=False)
