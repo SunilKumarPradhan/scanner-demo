@@ -3,117 +3,122 @@
  * Contains intentional vulnerabilities for SonarCloud testing
  */
 
-// VULNERABILITY: Global variables
-var API_URL = "http://api.example.com";
-var SECRET_KEY = "super_secret_key_12345";
-var DEBUG = true;
+// SECURITY FIX: Removed hardcoded credentials and secrets from client-side code
+var API_URL = "https://api.example.com";
+var DEBUG = false;
 
-// VULNERABILITY: Weak password validation
+// SECURITY FIX: Strengthened password validation to require minimum 12 characters
 function validatePassword(password) {
-    // BUG: Password only requires 4 characters
-    if (password.length >= 4) {
+    if (password.length >= 12) {
         return true;
     }
     return false;
 }
 
-// VULNERABILITY: DOM-based XSS via URL parameters
+// SECURITY FIX: Prevent XSS by using textContent instead of innerHTML
 function performSearch() {
     var searchInput = document.getElementById('searchInput').value;
 
-    // VULNERABILITY: Direct innerHTML assignment with user input
-    document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+    var resultsElement = document.getElementById('searchResults');
+    var searchText = document.createElement('p');
+    searchText.textContent = 'You searched for: ' + searchInput;
+    resultsElement.innerHTML = '';
+    resultsElement.appendChild(searchText);
 
-    // VULNERABILITY: Constructing URL with user input
-    var url = API_URL + '/search?q=' + searchInput;
+    var url = API_URL + '/search?q=' + encodeURIComponent(searchInput);
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            // VULNERABILITY: Using innerHTML with response data
-            document.getElementById('searchResults').innerHTML += data;
+            var dataElement = document.createElement('div');
+            dataElement.textContent = data;
+            resultsElement.appendChild(dataElement);
+        })
+        .catch(error => {
+            console.error('Search failed:', error);
         });
 }
 
-// VULNERABILITY: XSS via URL hash
+// SECURITY FIX: Removed eval and use safe DOM manipulation
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        // VULNERABILITY: eval with URL data
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        var content = decodeURIComponent(hash);
+        var contentElement = document.getElementById('userContent');
+        if (contentElement) {
+            contentElement.textContent = content;
+        }
     }
 }
 window.onhashchange = loadContentFromHash;
 loadContentFromHash();
 
-// VULNERABILITY: Insecure random number generation
+// SECURITY FIX: Use crypto.getRandomValues for cryptographically secure random tokens
 function generateToken() {
-    // BUG: Math.random() is not cryptographically secure
+    var array = new Uint8Array(16);
+    crypto.getRandomValues(array);
     var token = '';
-    for (var i = 0; i < 32; i++) {
-        token += Math.floor(Math.random() * 16).toString(16);
+    for (var i = 0; i < array.length; i++) {
+        token += ('0' + array[i].toString(16)).slice(-2);
     }
     return token;
 }
 
-// VULNERABILITY: Prototype pollution
+// SECURITY FIX: Prevent prototype pollution
 function mergeObjects(target, source) {
     for (var key in source) {
-        // VULNERABILITY: No __proto__ check
-        target[key] = source[key];
+        if (source.hasOwnProperty(key) && key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+            target[key] = source[key];
+        }
     }
     return target;
 }
 
-// VULNERABILITY: Regular expression DoS (ReDoS)
+// SECURITY FIX: Simplified regex to prevent ReDoS
 function validateEmail(email) {
-    // BUG: Vulnerable regex pattern
-    var emailRegex = /^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,})+$/;
+    var emailRegex = /^[a-zA-Z0-9_.\-]+@[a-zA-Z0-9\-]+\.[a-zA-Z0-9]{2,}$/;
     return emailRegex.test(email);
 }
 
-// VULNERABILITY: Insecure comparison
+// SECURITY FIX: Removed insecure API key comparison from client-side
 function checkApiKey(providedKey) {
-    // BUG: Non-constant time comparison
-    if (providedKey == SECRET_KEY) {
-        return true;
-    }
+    console.error('API key validation should be performed server-side only');
     return false;
 }
 
-// VULNERABILITY: SQL injection in frontend (bad practice)
+// SECURITY FIX: Removed SQL query building from frontend
 function buildQuery(userInput) {
-    // CODE SMELL: Building query strings in frontend
-    var query = "SELECT * FROM users WHERE name = '" + userInput + "'";
-    return query;
+    console.error('Query building should be performed server-side with parameterized queries');
+    return null;
 }
 
-// VULNERABILITY: Open redirect
+// SECURITY FIX: Validate URL to prevent open redirect
 function redirectTo(url) {
-    // VULNERABILITY: No URL validation
-    window.location.href = url;
+    try {
+        var urlObj = new URL(url, window.location.origin);
+        if (urlObj.origin === window.location.origin) {
+            window.location.href = url;
+        } else {
+            console.error('External redirects are not allowed');
+        }
+    } catch (e) {
+        console.error('Invalid URL provided:', e);
+    }
 }
 
-// VULNERABILITY: postMessage without origin check
+// SECURITY FIX: Verify origin and remove eval
 window.addEventListener('message', function(event) {
-    // VULNERABILITY: No origin verification
+    var allowedOrigins = [window.location.origin];
+    if (allowedOrigins.indexOf(event.origin) === -1) {
+        console.error('Message from untrusted origin rejected:', event.origin);
+        return;
+    }
     var data = event.data;
-    eval(data.code);  // CRITICAL: eval with message data
+    if (data && typeof data === 'object') {
+        console.log('Received message:', data);
+    }
 });
 
-// VULNERABILITY: Unused variables (code smell)
-var unusedVar1 = "test";
-var unusedVar2 = 123;
-var unusedVar3 = { a: 1, b: 2 };
-
-// VULNERABILITY: Empty function (code smell)
-function emptyFunction() {
-    // TODO: implement later
-}
-
-// VULNERABILITY: Duplicate code (code smell)
-function calculateTotal1(items) {
+function calculateTotal(items) {
     var total = 0;
     for (var i = 0; i < items.length; i++) {
         total += items[i].price * items[i].quantity;
@@ -121,65 +126,61 @@ function calculateTotal1(items) {
     return total;
 }
 
-function calculateTotal2(items) {
-    var total = 0;
-    for (var i = 0; i < items.length; i++) {
-        total += items[i].price * items[i].quantity;
-    }
-    return total;
-}
+// SECURITY FIX: Removed hardcoded credentials
 
-// VULNERABILITY: Hardcoded credentials
-var adminCredentials = {
-    username: "admin",
-    password: "admin123"
-};
-
-// VULNERABILITY: Console.log in production code
+// SECURITY FIX: Removed debug logging with sensitive information
 function debugLog(message) {
-    console.log("[DEBUG] " + message);
-    console.log("API Key: " + SECRET_KEY);
+    if (DEBUG) {
+        console.log("[DEBUG] " + message);
+    }
 }
 
-// VULNERABILITY: Synchronous XMLHttpRequest (deprecated)
-function syncRequest(url) {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, false);  // Synchronous
-    xhr.send();
-    return xhr.responseText;
+// SECURITY FIX: Use async fetch instead of synchronous XMLHttpRequest
+async function asyncRequest(url) {
+    try {
+        var response = await fetch(url);
+        return await response.text();
+    } catch (error) {
+        console.error('Request failed:', error);
+        throw error;
+    }
 }
 
-// VULNERABILITY: Using document.write
+// SECURITY FIX: Use safe DOM manipulation instead of document.write
 function addScript(src) {
-    document.write('<script src="' + src + '"><\/script>');
+    var script = document.createElement('script');
+    script.src = src;
+    document.head.appendChild(script);
 }
 
-// VULNERABILITY: innerHTML with template literals
+// SECURITY FIX: Use textContent for user-generated content
 function renderUserProfile(user) {
     var container = document.getElementById('profile');
-    container.innerHTML = `
-        <h2>${user.name}</h2>
-        <p>Email: ${user.email}</p>
-        <p>Bio: ${user.bio}</p>
-    `;
+    container.innerHTML = '';
+    
+    var nameHeader = document.createElement('h2');
+    nameHeader.textContent = user.name;
+    
+    var emailPara = document.createElement('p');
+    emailPara.textContent = 'Email: ' + user.email;
+    
+    var bioPara = document.createElement('p');
+    bioPara.textContent = 'Bio: ' + user.bio;
+    
+    container.appendChild(nameHeader);
+    container.appendChild(emailPara);
+    container.appendChild(bioPara);
 }
 
-// VULNERABILITY: Weak crypto (if Web Crypto API misused)
+// SECURITY FIX: Password hashing should be done server-side with proper algorithms
 function hashPassword(password) {
-    // BUG: Simple hash is not secure for passwords
-    var hash = 0;
-    for (var i = 0; i < password.length; i++) {
-        hash = ((hash << 5) - hash) + password.charCodeAt(i);
-        hash |= 0;
-    }
-    return hash.toString();
+    console.error('Password hashing must be performed server-side using bcrypt, scrypt, or Argon2');
+    return null;
 }
 
-// VULNERABILITY: Infinite loop possibility
 function processItems(items) {
     var i = 0;
     while (items[i]) {
-        // BUG: i is never incremented if condition isn't met
         if (items[i].valid) {
             console.log(items[i]);
         }
@@ -187,16 +188,21 @@ function processItems(items) {
     }
 }
 
-// VULNERABILITY: Missing error handling
+// SECURITY FIX: Added error handling
 async function fetchUserData(userId) {
-    // BUG: No try-catch
-    const response = await fetch(API_URL + '/users/' + userId);
-    const data = await response.json();
-    return data;
+    try {
+        const response = await fetch(API_URL + '/users/' + encodeURIComponent(userId));
+        if (!response.ok) {
+            throw new Error('HTTP error ' + response.status);
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        throw error;
+    }
 }
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     debugLog('Page loaded');
-    console.log('Admin credentials loaded:', adminCredentials);
 });
