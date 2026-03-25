@@ -3,8 +3,8 @@
  * Contains intentional vulnerabilities for SonarCloud testing
  */
 
-// VULNERABILITY: Global variables
-var API_URL = "http://api.example.com";
+// SECURITY FIX: Use HTTPS for API endpoint
+var API_URL = "https://api.example.com";
 var SECRET_KEY = "super_secret_key_12345";
 var DEBUG = true;
 
