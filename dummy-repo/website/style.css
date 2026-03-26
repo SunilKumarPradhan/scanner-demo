@@ -18,12 +18,11 @@ body {
     background-color: #f4f4f4 !important;
 }
 
-/* CODE SMELL: Duplicate properties */
+/* SECURITY FIX: Removed duplicate max-width property */
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
-    max-width: 1200px; /* Duplicate */
 }
 
 /* Header Styles */
@@ -96,7 +95,7 @@ nav a:hover {
 #main-cta-button {
     display: inline-block;
     background: white;
-    color: #667eea;
+    color: #5568c4;
     padding: 1rem 2rem;
     border-radius: 50px;
     text-decoration: none;
@@ -134,6 +133,7 @@ nav a:hover {
     border-radius: 10px;
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid #eee;
 }
 
 .feature-card:hover {
@@ -153,7 +153,7 @@ nav a:hover {
 }
 
 .feature-card p {
-    color: #666;
+    color: #595959;
 }
 
 /* Search Section */
@@ -247,7 +247,7 @@ nav a:hover {
 .form-group label {
     display: block;
     margin-bottom: 0.5rem;
-    color: #555;
+    color: #4a4a4a;
     font-weight: 500;
 }
 
@@ -305,7 +305,7 @@ nav a:hover {
 }
 
 .login-links a {
-    color: #667eea;
+    color: #5568c4;
     text-decoration: none;
 }
 
@@ -322,13 +322,13 @@ nav a:hover {
 
 #loginError {
     background: #fee;
-    color: #c00;
+    color: #b30000;
     border: 1px solid #fcc;
 }
 
 #loginSuccess {
     background: #efe;
-    color: #0a0;
+    color: #008000;
     border: 1px solid #cfc;
 }
 
@@ -359,15 +359,6 @@ footer {
 
 footer p {
     opacity: 0.8;
-}
-
-/* CODE SMELL: Empty rule */
-.unused-class {
-}
-
-/* CODE SMELL: Duplicate selector */
-.feature-card {
-    border: 1px solid #eee;
 }
 
 /* Utility Classes */
@@ -420,14 +411,6 @@ footer p {
         flex-direction: column;
     }
 }
-
-/* CODE SMELL: Commented out code */
-/*
-.old-feature {
-    display: none;
-    background: red;
-}
-*/
 
 /* CODE SMELL: Magic numbers */
 .custom-spacing {
