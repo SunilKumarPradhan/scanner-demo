@@ -3,10 +3,9 @@
  * Contains intentional vulnerabilities for SonarCloud testing
  */
 
-// VULNERABILITY: Global variables
+// SECURITY FIX: Removed hardcoded credentials and secrets from client-side code
 var API_URL = "http://api.example.com";
-var SECRET_KEY = "super_secret_key_12345";
-var DEBUG = true;
+var DEBUG = false; // SECURITY FIX: Disabled debug mode for production
 
 // VULNERABILITY: Weak password validation
 function validatePassword(password) {
@@ -17,51 +16,55 @@ function validatePassword(password) {
     return false;
 }
 
-// VULNERABILITY: DOM-based XSS via URL parameters
+// SECURITY FIX: Use textContent instead of innerHTML to prevent XSS
 function performSearch() {
     var searchInput = document.getElementById('searchInput').value;
 
-    // VULNERABILITY: Direct innerHTML assignment with user input
-    document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+    var resultsElement = document.getElementById('searchResults');
+    var searchText = document.createElement('p');
+    searchText.textContent = 'You searched for: ' + searchInput;
+    resultsElement.innerHTML = '';
+    resultsElement.appendChild(searchText);
 
-    // VULNERABILITY: Constructing URL with user input
-    var url = API_URL + '/search?q=' + searchInput;
+    var url = API_URL + '/search?q=' + encodeURIComponent(searchInput);
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            // VULNERABILITY: Using innerHTML with response data
-            document.getElementById('searchResults').innerHTML += data;
+            var dataElement = document.createElement('div');
+            dataElement.textContent = data;
+            resultsElement.appendChild(dataElement);
         });
 }
 
-// VULNERABILITY: XSS via URL hash
+// SECURITY FIX: Removed eval and use textContent instead of innerHTML
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        // VULNERABILITY: eval with URL data
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        var content = decodeURIComponent(hash);
+        var contentElement = document.getElementById('userContent');
+        contentElement.textContent = content;
     }
 }
 window.onhashchange = loadContentFromHash;
 loadContentFromHash();
 
-// VULNERABILITY: Insecure random number generation
+// SECURITY FIX: Use crypto.getRandomValues for cryptographically secure random tokens
 function generateToken() {
-    // BUG: Math.random() is not cryptographically secure
+    var array = new Uint8Array(16);
+    crypto.getRandomValues(array);
     var token = '';
-    for (var i = 0; i < 32; i++) {
-        token += Math.floor(Math.random() * 16).toString(16);
+    for (var i = 0; i < array.length; i++) {
+        token += ('0' + array[i].toString(16)).slice(-2);
     }
     return token;
 }
 
-// VULNERABILITY: Prototype pollution
+// SECURITY FIX: Prevent prototype pollution
 function mergeObjects(target, source) {
     for (var key in source) {
-        // VULNERABILITY: No __proto__ check
-        target[key] = source[key];
+        if (source.hasOwnProperty(key) && key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+            target[key] = source[key];
+        }
     }
     return target;
 }
@@ -73,12 +76,8 @@ function validateEmail(email) {
     return emailRegex.test(email);
 }
 
-// VULNERABILITY: Insecure comparison
+// SECURITY FIX: Removed insecure comparison function - secrets should not be in client-side code
 function checkApiKey(providedKey) {
-    // BUG: Non-constant time comparison
-    if (providedKey == SECRET_KEY) {
-        return true;
-    }
     return false;
 }
 
@@ -89,17 +88,27 @@ function buildQuery(userInput) {
     return query;
 }
 
-// VULNERABILITY: Open redirect
+// SECURITY FIX: Validate URL to prevent open redirect
 function redirectTo(url) {
-    // VULNERABILITY: No URL validation
-    window.location.href = url;
+    try {
+        var urlObj = new URL(url, window.location.origin);
+        if (urlObj.origin === window.location.origin) {
+            window.location.href = url;
+        }
+    } catch (e) {
+        console.error('Invalid URL');
+    }
 }
 
-// VULNERABILITY: postMessage without origin check
+// SECURITY FIX: Verify origin and remove eval
 window.addEventListener('message', function(event) {
-    // VULNERABILITY: No origin verification
+    if (event.origin !== window.location.origin) {
+        return;
+    }
     var data = event.data;
-    eval(data.code);  // CRITICAL: eval with message data
+    if (data && typeof data === 'object') {
+        console.log('Received message:', data);
+    }
 });
 
 // VULNERABILITY: Unused variables (code smell)
@@ -129,39 +138,47 @@ function calculateTotal2(items) {
     return total;
 }
 
-// VULNERABILITY: Hardcoded credentials
-var adminCredentials = {
-    username: "admin",
-    password: "admin123"
-};
+// SECURITY FIX: Removed hardcoded credentials from client-side code
 
-// VULNERABILITY: Console.log in production code
+// SECURITY FIX: Removed debug logging that exposes secrets
 function debugLog(message) {
-    console.log("[DEBUG] " + message);
-    console.log("API Key: " + SECRET_KEY);
+    if (DEBUG) {
+        console.log("[DEBUG] " + message);
+    }
 }
 
 // VULNERABILITY: Synchronous XMLHttpRequest (deprecated)
 function syncRequest(url) {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, false);  // Synchronous
+    xhr.open('GET', url, false);
     xhr.send();
     return xhr.responseText;
 }
 
-// VULNERABILITY: Using document.write
+// SECURITY FIX: Use DOM methods instead of document.write
 function addScript(src) {
-    document.write('<script src="' + src + '"><\/script>');
+    var script = document.createElement('script');
+    script.src = src;
+    document.head.appendChild(script);
 }
 
-// VULNERABILITY: innerHTML with template literals
+// SECURITY FIX: Use textContent for user-controlled data
 function renderUserProfile(user) {
     var container = document.getElementById('profile');
-    container.innerHTML = `
-        <h2>${user.name}</h2>
-        <p>Email: ${user.email}</p>
-        <p>Bio: ${user.bio}</p>
-    `;
+    container.innerHTML = '';
+    
+    var nameHeader = document.createElement('h2');
+    nameHeader.textContent = user.name;
+    
+    var emailPara = document.createElement('p');
+    emailPara.textContent = 'Email: ' + user.email;
+    
+    var bioPara = document.createElement('p');
+    bioPara.textContent = 'Bio: ' + user.bio;
+    
+    container.appendChild(nameHeader);
+    container.appendChild(emailPara);
+    container.appendChild(bioPara);
 }
 
 // VULNERABILITY: Weak crypto (if Web Crypto API misused)
@@ -187,16 +204,22 @@ function processItems(items) {
     }
 }
 
-// VULNERABILITY: Missing error handling
+// SECURITY FIX: Add error handling
 async function fetchUserData(userId) {
-    // BUG: No try-catch
-    const response = await fetch(API_URL + '/users/' + userId);
-    const data = await response.json();
-    return data;
+    try {
+        const response = await fetch(API_URL + '/users/' + encodeURIComponent(userId));
+        if (!response.ok) {
+            throw new Error('HTTP error ' + response.status);
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        throw error;
+    }
 }
 
-// Initialize on page load
+// SECURITY FIX: Removed logging of sensitive credentials
 document.addEventListener('DOMContentLoaded', function() {
     debugLog('Page loaded');
-    console.log('Admin credentials loaded:', adminCredentials);
 });

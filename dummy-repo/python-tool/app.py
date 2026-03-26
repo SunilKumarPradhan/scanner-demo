@@ -10,18 +10,21 @@ import subprocess
 import hashlib
 import random
 import tempfile
-from flask import Flask, request, render_template_string, redirect, send_file
+import secrets
+import re
+from flask import Flask, request, render_template_string, redirect, send_file, abort
+from werkzeug.security import safe_join
 from database import Database
 from config import Config
 from utils import execute_command, read_file
 
 app = Flask(__name__)
 
-# VULNERABILITY: Debug mode enabled in production
-app.debug = True
+# SECURITY FIX: Debug mode disabled in production
+app.debug = False
 
-# VULNERABILITY: Hardcoded secret key
-app.secret_key = "super_secret_key_123456789"
+# SECURITY FIX: Use environment variable for secret key
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # VULNERABILITY: Global mutable default
 USERS_CACHE = {}
@@ -40,152 +43,208 @@ def login():
     user = db.get_user(username, password)
 
     if user:
-        # VULNERABILITY: Sensitive data in response
-        return f"Welcome {username}! Your password is: {password}"
+        # SECURITY FIX: Don't expose password in response
+        return f"Welcome {username}!"
     return "Login failed", 401
 
 
-# VULNERABILITY: Server-Side Template Injection (SSTI)
+# SECURITY FIX: Prevent Server-Side Template Injection (SSTI)
 @app.route('/greet')
 def greet():
     name = request.args.get('name', 'Guest')
-    # VULNERABILITY: User input directly in template
-    template = f"<h1>Hello {name}!</h1>"
-    return render_template_string(template)
+    # SECURITY FIX: Use safe template rendering with auto-escaping
+    from markupsafe import escape
+    template = f"<h1>Hello {escape(name)}!</h1>"
+    return template
 
 
-# VULNERABILITY: Command Injection
+# SECURITY FIX: Prevent Command Injection
 @app.route('/ping')
 def ping():
     host = request.args.get('host', '127.0.0.1')
-    # VULNERABILITY: Unsanitized input to shell command
-    result = os.popen(f"ping -c 1 {host}").read()
-    return f"<pre>{result}</pre>"
+    # SECURITY FIX: Validate input and use subprocess with list arguments
+    if not re.match(r'^[a-zA-Z0-9\.\-]+$', host):
+        return "Invalid host", 400
+    try:
+        result = subprocess.run(['ping', '-c', '1', host], capture_output=True, text=True, timeout=5)
+        return f"<pre>{result.stdout}</pre>"
+    except subprocess.TimeoutExpired:
+        return "Request timeout", 408
+    except Exception as e:
+        app.logger.error(f"Ping error: {str(e)}")
+        return "Error executing ping", 500
 
 
-# VULNERABILITY: Path Traversal
+# SECURITY FIX: Prevent Path Traversal
 @app.route('/download')
 def download():
     filename = request.args.get('file')
-    # VULNERABILITY: No path validation
-    filepath = os.path.join('/var/data/', filename)
-    return send_file(filepath)
+    if not filename:
+        return "File parameter required", 400
+    # SECURITY FIX: Validate path to prevent traversal
+    try:
+        filepath = safe_join('/var/data/', filename)
+        if filepath is None or not filepath.startswith('/var/data/'):
+            return "Invalid file path", 400
+        if not os.path.exists(filepath):
+            return "File not found", 404
+        return send_file(filepath)
+    except Exception as e:
+        app.logger.error(f"Download error: {str(e)}")
+        return "Error downloading file", 500
 
 
-# VULNERABILITY: XML External Entity (XXE)
+# SECURITY FIX: Prevent XML External Entity (XXE)
 @app.route('/parse_xml', methods=['POST'])
 def parse_xml():
     import xml.etree.ElementTree as ET
-    # VULNERABILITY: External entity processing enabled
+    import defusedxml.ElementTree as DefusedET
+    # SECURITY FIX: Use defusedxml to prevent XXE attacks
     xml_data = request.data
-    tree = ET.fromstring(xml_data)
-    return tree.text
+    try:
+        tree = DefusedET.fromstring(xml_data)
+        return tree.text if tree.text else ""
+    except Exception as e:
+        app.logger.error(f"XML parsing error: {str(e)}")
+        return "Invalid XML", 400
 
 
-# VULNERABILITY: Insecure Deserialization
+# SECURITY FIX: Prevent Insecure Deserialization
 @app.route('/load_session', methods=['POST'])
 def load_session():
     session_data = request.form.get('session')
-    # VULNERABILITY: pickle.loads with untrusted data
-    data = pickle.loads(bytes.fromhex(session_data))
-    return str(data)
+    # SECURITY FIX: Use JSON instead of pickle for untrusted data
+    import json
+    try:
+        data = json.loads(bytes.fromhex(session_data).decode('utf-8'))
+        return str(data)
+    except Exception as e:
+        app.logger.error(f"Session load error: {str(e)}")
+        return "Invalid session data", 400
 
 
-# VULNERABILITY: Open Redirect
+# SECURITY FIX: Prevent Open Redirect
 @app.route('/redirect')
 def redirect_url():
     url = request.args.get('url')
-    # VULNERABILITY: Unvalidated redirect
+    # SECURITY FIX: Validate redirect URL to same domain only
+    if not url:
+        return "URL parameter required", 400
+    if not url.startswith('/') or url.startswith('//'):
+        return "Invalid redirect URL", 400
     return redirect(url)
 
 
-# VULNERABILITY: SSRF (Server-Side Request Forgery)
+# SECURITY FIX: Prevent SSRF (Server-Side Request Forgery)
 @app.route('/fetch')
 def fetch_url():
     import urllib.request
+    from urllib.parse import urlparse
     url = request.args.get('url')
-    # VULNERABILITY: No URL validation
-    response = urllib.request.urlopen(url)
-    return response.read()
+    # SECURITY FIX: Validate URL to prevent SSRF
+    if not url:
+        return "URL parameter required", 400
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ['http', 'https']:
+            return "Invalid URL scheme", 400
+        if parsed.hostname in ['localhost', '127.0.0.1', '0.0.0.0'] or parsed.hostname.startswith('192.168.') or parsed.hostname.startswith('10.'):
+            return "Access to internal resources denied", 403
+        response = urllib.request.urlopen(url, timeout=5)
+        return response.read()
+    except Exception as e:
+        app.logger.error(f"Fetch error: {str(e)}")
+        return "Error fetching URL", 500
 
 
-# VULNERABILITY: Weak cryptographic hash
+# SECURITY FIX: Use strong cryptographic hash
 @app.route('/hash', methods=['POST'])
 def hash_password():
     password = request.form.get('password')
-    # VULNERABILITY: MD5 is cryptographically broken
-    hashed = hashlib.md5(password.encode()).hexdigest()
+    # SECURITY FIX: Use SHA-256 instead of MD5
+    hashed = hashlib.sha256(password.encode()).hexdigest()
     return f"Hash: {hashed}"
 
 
-# VULNERABILITY: Information Disclosure
+# SECURITY FIX: Don't expose stack traces
 @app.route('/error')
 def trigger_error():
     try:
         result = 1 / 0
     except Exception as e:
-        # VULNERABILITY: Exposing stack trace
-        import traceback
-        return f"<pre>{traceback.format_exc()}</pre>"
+        # SECURITY FIX: Log error but return generic message
+        app.logger.error(f"Error occurred: {str(e)}")
+        return "An error occurred", 500
 
 
-# VULNERABILITY: Insecure Random
+# SECURITY FIX: Use cryptographically secure random
 @app.route('/token')
 def generate_token():
-    # VULNERABILITY: Predictable random
-    token = ''.join([str(random.randint(0, 9)) for _ in range(16)])
+    # SECURITY FIX: Use secrets module for cryptographic randomness
+    token = secrets.token_hex(16)
     return f"Token: {token}"
 
 
-# VULNERABILITY: Hardcoded credentials check
+# SECURITY FIX: Don't use hardcoded credentials
 @app.route('/admin')
 def admin_panel():
     auth = request.headers.get('Authorization')
-    # VULNERABILITY: Hardcoded admin credentials
-    if auth == "Basic YWRtaW46YWRtaW4xMjM=":  # admin:admin123
+    # SECURITY FIX: Use environment variable or secure credential store
+    expected_auth = os.environ.get('ADMIN_AUTH_TOKEN')
+    if expected_auth and auth == expected_auth:
         return "Welcome to admin panel"
     return "Unauthorized", 401
 
 
-# VULNERABILITY: Log Injection
+# SECURITY FIX: Prevent Log Injection
 @app.route('/log')
 def log_message():
     message = request.args.get('msg')
-    # VULNERABILITY: Unsanitized log input
-    app.logger.info(f"User message: {message}")
+    # SECURITY FIX: Sanitize log input to prevent injection
+    sanitized_message = message.replace('\n', ' ').replace('\r', ' ') if message else ''
+    app.logger.info(f"User message: {sanitized_message}")
     return "Logged"
 
 
-# VULNERABILITY: Denial of Service via regex
+# SECURITY FIX: Prevent ReDoS
 @app.route('/validate_email')
 def validate_email():
     import re
     email = request.args.get('email')
-    # VULNERABILITY: ReDoS vulnerable pattern
-    pattern = r'^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,})+$'
-    if re.match(pattern, email):
+    # SECURITY FIX: Use simpler, non-vulnerable regex pattern
+    pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if email and len(email) < 255 and re.match(pattern, email):
         return "Valid"
     return "Invalid"
 
 
-# VULNERABILITY: Mass Assignment
+# SECURITY FIX: Prevent Mass Assignment
 @app.route('/update_user', methods=['POST'])
 def update_user():
     user_id = request.form.get('user_id')
-    # VULNERABILITY: Accepting all fields from request
-    updates = dict(request.form)
+    # SECURITY FIX: Whitelist allowed fields
+    allowed_fields = ['email', 'name', 'phone']
+    updates = {k: v for k, v in request.form.items() if k in allowed_fields}
     db.update_user(user_id, **updates)
     return "Updated"
 
 
-# VULNERABILITY: Insufficient input validation
+# SECURITY FIX: Add input validation
 @app.route('/process', methods=['POST'])
 def process_data():
     data = request.json
-    # VULNERABILITY: No input validation
-    amount = data['amount']
-    result = int(amount) * 100
-    return str(result)
+    # SECURITY FIX: Validate input exists and is valid
+    if not data or 'amount' not in data:
+        return "Invalid input", 400
+    try:
+        amount = int(data['amount'])
+        if amount < 0 or amount > 1000000:
+            return "Amount out of range", 400
+        result = amount * 100
+        return str(result)
+    except (ValueError, TypeError) as e:
+        app.logger.error(f"Process data error: {str(e)}")
+        return "Invalid amount", 400
 
 
 # CODE SMELL: Function too complex (high cyclomatic complexity)
@@ -245,13 +304,14 @@ def unused_variables():
     return "done"
 
 
-# CODE SMELL: Empty except block
+# SECURITY FIX: Never swallow exceptions silently
 def bad_error_handling():
     try:
         result = risky_operation()
-    except:
-        pass  # VULNERABILITY: Swallowing exceptions
-    return None
+        return result
+    except Exception as e:
+        app.logger.error(f"Error in risky_operation: {str(e)}")
+        raise
 
 
 # CODE SMELL: Too many parameters
@@ -259,54 +319,61 @@ def too_many_params(a, b, c, d, e, f, g, h, i, j):
     return a + b + c + d + e + f + g + h + i + j
 
 
-# VULNERABILITY: Temporary file with race condition
+# SECURITY FIX: Use secure temporary file creation
 def create_temp_file(data):
-    temp_path = f"/tmp/data_{random.randint(1000, 9999)}.txt"
-    # VULNERABILITY: TOCTOU race condition
-    if not os.path.exists(temp_path):
-        with open(temp_path, 'w') as f:
-            f.write(data)
-    return temp_path
+    # SECURITY FIX: Use tempfile module to avoid race conditions
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        f.write(data)
+        return f.name
 
 
-# VULNERABILITY: Eval with user input
+# SECURITY FIX: Never use eval with user input
 @app.route('/calculate')
 def calculate():
     expression = request.args.get('expr')
-    # VULNERABILITY: eval with user input
-    result = eval(expression)
-    return str(result)
+    # SECURITY FIX: Use safe evaluation or reject
+    return "Calculation disabled for security reasons", 403
 
 
-# VULNERABILITY: exec with user input
+# SECURITY FIX: Never use exec with user input
 @app.route('/execute', methods=['POST'])
 def execute_code():
     code = request.form.get('code')
-    # VULNERABILITY: exec with user input
-    exec(code)
-    return "Executed"
+    # SECURITY FIX: Reject code execution
+    return "Code execution disabled for security reasons", 403
 
 
-# VULNERABILITY: assert used for validation
+# SECURITY FIX: Use proper validation instead of assert
 def validate_age(age):
-    # VULNERABILITY: assert statements can be disabled
-    assert age >= 0, "Age must be positive"
-    assert age <= 150, "Age must be realistic"
+    # SECURITY FIX: Use if statements for validation
+    if not isinstance(age, (int, float)):
+        raise ValueError("Age must be a number")
+    if age < 0:
+        raise ValueError("Age must be positive")
+    if age > 150:
+        raise ValueError("Age must be realistic")
     return True
 
 
-# VULNERABILITY: Cleartext transmission
+# SECURITY FIX: Use TLS and don't hardcode credentials
 def send_password_email(email, password):
     import smtplib
-    # VULNERABILITY: Sending password in plain text
-    message = f"Your password is: {password}"
-    # Also VULNERABILITY: Hardcoded SMTP credentials
-    server = smtplib.SMTP('smtp.example.com', 25)
-    server.login('admin@example.com', 'smtp_password_123')
+    # SECURITY FIX: Use TLS and environment variables for credentials
+    message = f"Your password has been reset"
+    smtp_host = os.environ.get('SMTP_HOST', 'smtp.example.com')
+    smtp_user = os.environ.get('SMTP_USER')
+    smtp_pass = os.environ.get('SMTP_PASS')
+    if not smtp_user or not smtp_pass:
+        app.logger.error("SMTP credentials not configured")
+        raise ValueError("SMTP not configured")
+    server = smtplib.SMTP(smtp_host, 587)
+    server.starttls()
+    server.login(smtp_user, smtp_pass)
     server.sendmail('noreply@example.com', email, message)
+    server.quit()
 
 
 # Entry point
 if __name__ == '__main__':
-    # VULNERABILITY: Binding to all interfaces
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # SECURITY FIX: Bind to localhost only in production
+    app.run(host='127.0.0.1', port=5000, debug=False)
