@@ -10,22 +10,18 @@
     <div class="login-container">
         <h1>Login</h1>
 
-        <!-- VULNERABILITY: Form without HTTPS, no autocomplete="off" for sensitive fields -->
-        <!-- VULNERABILITY: Action points to HTTP endpoint -->
-        <form id="loginForm" action="http://api.example.com/login" method="POST">
+        <form id="loginForm" action="https://api.example.com/login" method="POST">
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
+                <input type="text" id="username" name="username" autocomplete="username" required>
             </div>
 
             <div class="form-group">
                 <label for="password">Password</label>
-                <!-- VULNERABILITY: Password field without autocomplete="new-password" -->
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" autocomplete="current-password" required>
             </div>
 
             <div class="form-group">
-                <!-- VULNERABILITY: Storing sensitive data -->
                 <label>
                     <input type="checkbox" id="rememberMe" name="rememberMe">
                     Remember me
@@ -44,7 +40,6 @@
     </div>
 
     <script>
-        // VULNERABILITY: Storing password in localStorage
         document.getElementById('loginForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
@@ -52,43 +47,43 @@
             var password = document.getElementById('password').value;
             var rememberMe = document.getElementById('rememberMe').checked;
 
-            // SECURITY ISSUE: Storing credentials in localStorage
             if (rememberMe) {
                 localStorage.setItem('username', username);
-                localStorage.setItem('password', password);  // CRITICAL VULNERABILITY
             }
 
-            // VULNERABILITY: Sending credentials via GET parameters
-            var url = 'http://api.example.com/auth?user=' + username + '&pass=' + password;
-
-            // VULNERABILITY: Using XMLHttpRequest without proper error handling
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.send();
+            xhr.open('POST', 'https://api.example.com/login', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify({
+                username: username,
+                password: password
+            }));
 
             xhr.onload = function() {
                 if (xhr.status == 200) {
-                    // VULNERABILITY: innerHTML with response data
-                    document.getElementById('loginError').innerHTML = xhr.responseText;
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        document.getElementById('loginError').textContent = response.message || '';
 
-                    // VULNERABILITY: Storing token without HttpOnly flag consideration
-                    var token = JSON.parse(xhr.responseText).token;
-                    document.cookie = "auth_token=" + token;  // No Secure, HttpOnly flags
+                        if (response.token) {
+                            document.cookie = "auth_token=" + response.token + "; Secure; HttpOnly; SameSite=Strict";
+                        }
 
-                    window.location.href = 'dashboard.html';
+                        globalThis.location.href = 'dashboard.html';
+                    } catch (error) {
+                        document.getElementById('loginError').textContent = 'An error occurred during login.';
+                    }
                 }
             };
         });
 
-        // VULNERABILITY: Exposing debug information
-        console.log('Debug mode enabled');
-        console.log('Server: ' + window.location.hostname);
-
-        // VULNERABILITY: Checking for admin in client-side
         function checkAdmin() {
             var isAdmin = localStorage.getItem('isAdmin') === 'true';
             if (isAdmin) {
-                document.body.innerHTML += '<a href="/admin">Admin Panel</a>';
+                var adminLink = document.createElement('a');
+                adminLink.href = '/admin';
+                adminLink.textContent = 'Admin Panel';
+                document.body.appendChild(adminLink);
             }
         }
         checkAdmin();
