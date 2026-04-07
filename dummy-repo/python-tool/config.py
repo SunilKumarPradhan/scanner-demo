@@ -6,172 +6,144 @@ Contains intentional hardcoded credentials and secrets for SonarCloud testing
 import os
 
 
-# VULNERABILITY: Hardcoded credentials
+# SECURITY FIX: All hardcoded credentials replaced with environment variables
 class Config:
-    """Application configuration with hardcoded secrets."""
+    """Application configuration with secrets from environment."""
 
-    # VULNERABILITY: Hardcoded database credentials
-    DB_HOST = "localhost"
-    DB_PORT = 3306
-    DB_NAME = "production_db"
-    DB_USER = "admin"
-    DB_PASSWORD = "SuperSecretPassword123!"
+    # SECURITY FIX: Database credentials from environment
+    DB_HOST = os.getenv("DB_HOST", "localhost")
+    DB_PORT = int(os.getenv("DB_PORT", "3306"))
+    DB_NAME = os.getenv("DB_NAME", "production_db")
+    DB_USER = os.getenv("DB_USER")
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-    # VULNERABILITY: Hardcoded API keys
-    API_KEY = "sk-prod-api-key-1234567890abcdef"
-    API_SECRET = "api-secret-xyz-987654321"
+    # SECURITY FIX: API keys from environment
+    API_KEY = os.getenv("API_KEY")
+    API_SECRET = os.getenv("API_SECRET")
 
-    # VULNERABILITY: Hardcoded AWS credentials
-    AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
-    AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-    AWS_REGION = "us-east-1"
+    # SECURITY FIX: AWS credentials from environment
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
-    # VULNERABILITY: Hardcoded JWT secret
-    JWT_SECRET = "my-super-secret-jwt-signing-key-2024"
+    # SECURITY FIX: JWT secret from environment
+    JWT_SECRET = os.getenv("JWT_SECRET")
     JWT_ALGORITHM = "HS256"
 
-    # VULNERABILITY: Hardcoded encryption key
-    ENCRYPTION_KEY = "32-byte-encryption-key-here-1234"
-    ENCRYPTION_IV = "16-byte-iv-here!"
+    # SECURITY FIX: Encryption key from environment
+    ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+    ENCRYPTION_IV = os.getenv("ENCRYPTION_IV")
 
-    # VULNERABILITY: Hardcoded OAuth credentials
-    OAUTH_CLIENT_ID = "1234567890-abcdefghijklmnop.apps.googleusercontent.com"
-    OAUTH_CLIENT_SECRET = "GOCSPX-AbCdEfGhIjKlMnOpQrStUvWxYz"
+    # SECURITY FIX: OAuth credentials from environment
+    OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID")
+    OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET")
 
-    # VULNERABILITY: Hardcoded SMTP credentials
-    SMTP_HOST = "smtp.gmail.com"
-    SMTP_PORT = 587
-    SMTP_USER = "notifications@company.com"
-    SMTP_PASSWORD = "EmailPassword123!"
+    # SECURITY FIX: SMTP credentials from environment
+    SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
-    # VULNERABILITY: Hardcoded payment gateway credentials
-    STRIPE_SECRET_KEY = "sk_live_51ABC123DEF456GHI789JKL"
-    STRIPE_PUBLISHABLE_KEY = "pk_live_51ABC123DEF456GHI789JKL"
-    PAYPAL_CLIENT_ID = "AXy1234567890abcdefghijklmnopqrstuvwx"
-    PAYPAL_CLIENT_SECRET = "EHj9876543210zyxwvutsrqponmlkjihgfed"
+    # SECURITY FIX: Payment gateway credentials from environment
+    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+    STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+    PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID")
+    PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET")
 
-    # VULNERABILITY: Hardcoded SSH key (partial)
-    SSH_PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB5mCFv+3qYsRRtZCAm
-FakePrivateKeyForTestingPurposesOnlyDoNotUseInProduction1234567890
-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
------END RSA PRIVATE KEY-----"""
+    # SECURITY FIX: SSH key from environment
+    SSH_PRIVATE_KEY = os.getenv("SSH_PRIVATE_KEY")
 
-    # VULNERABILITY: Hardcoded admin credentials
-    ADMIN_USERNAME = "superadmin"
-    ADMIN_PASSWORD = "Admin@123456"
+    # SECURITY FIX: Admin credentials from environment
+    ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-    # VULNERABILITY: Hardcoded service account
-    SERVICE_ACCOUNT_USER = "service_worker"
-    SERVICE_ACCOUNT_PASS = "ServicePass2024!"
+    # SECURITY FIX: Service account from environment
+    SERVICE_ACCOUNT_USER = os.getenv("SERVICE_ACCOUNT_USER")
+    SERVICE_ACCOUNT_PASS = os.getenv("SERVICE_ACCOUNT_PASS")
 
-    # VULNERABILITY: Hardcoded third-party service credentials
-    GITHUB_TOKEN = "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    TWILIO_ACCOUNT_SID = "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    TWILIO_AUTH_TOKEN = "your_auth_token_here_12345"
-    SENDGRID_API_KEY = "SG.xxxxxxxxxxxxxxxxxxxxxx.yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    # SECURITY FIX: Third-party service credentials from environment
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+    TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+    SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 
-    # VULNERABILITY: Debug mode enabled
-    DEBUG = True
-    TESTING = True
+    # SECURITY FIX: Debug mode disabled by default
+    DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+    TESTING = os.getenv("TESTING", "False").lower() == "true"
 
-    # VULNERABILITY: Insecure session configuration
-    SESSION_COOKIE_SECURE = False
-    SESSION_COOKIE_HTTPONLY = False
-    PERMANENT_SESSION_LIFETIME = 31536000  # 1 year - too long
+    # SECURITY FIX: Secure session configuration
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "True").lower() == "true"
+    SESSION_COOKIE_HTTPONLY = os.getenv("SESSION_COOKIE_HTTPONLY", "True").lower() == "true"
+    PERMANENT_SESSION_LIFETIME = int(os.getenv("PERMANENT_SESSION_LIFETIME", "3600"))
 
-    # VULNERABILITY: Weak password policy
-    MIN_PASSWORD_LENGTH = 4  # Too short
-    REQUIRE_SPECIAL_CHARS = False
-    REQUIRE_NUMBERS = False
-    REQUIRE_UPPERCASE = False
+    # SECURITY FIX: Strong password policy
+    MIN_PASSWORD_LENGTH = int(os.getenv("MIN_PASSWORD_LENGTH", "12"))
+    REQUIRE_SPECIAL_CHARS = os.getenv("REQUIRE_SPECIAL_CHARS", "True").lower() == "true"
+    REQUIRE_NUMBERS = os.getenv("REQUIRE_NUMBERS", "True").lower() == "true"
+    REQUIRE_UPPERCASE = os.getenv("REQUIRE_UPPERCASE", "True").lower() == "true"
 
-    # VULNERABILITY: Insecure CORS configuration
-    CORS_ORIGINS = ["*"]  # Allow all origins
-    CORS_ALLOW_CREDENTIALS = True
+    # SECURITY FIX: Secure CORS configuration
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else []
+    CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "False").lower() == "true"
 
-    # VULNERABILITY: Hardcoded certificate
-    SSL_CERT = """-----BEGIN CERTIFICATE-----
-MIIDXTCCAkWgAwIBAgIJAJC1HiIAZAiUMA0GCSqGSIb3Fa...
-FakeCertificateDataForTestingOnly
------END CERTIFICATE-----"""
-
-    SSL_KEY = """-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwgg...
-FakeKeyDataForTestingOnly
------END PRIVATE KEY-----"""
+    # SECURITY FIX: Certificate from environment
+    SSL_CERT = os.getenv("SSL_CERT")
+    SSL_KEY = os.getenv("SSL_KEY")
 
 
-# VULNERABILITY: Hardcoded connection strings
-DATABASE_URL = "postgresql://admin:password123@prod-db.example.com:5432/myapp"
-REDIS_URL = "redis://:redis_password@cache.example.com:6379/0"
-MONGODB_URI = "mongodb://dbuser:dbpass123@mongo.example.com:27017/appdb"
-ELASTICSEARCH_URL = "http://elastic:changeme@es.example.com:9200"
+# SECURITY FIX: Connection strings from environment
+DATABASE_URL = os.getenv("DATABASE_URL")
+REDIS_URL = os.getenv("REDIS_URL")
+MONGODB_URI = os.getenv("MONGODB_URI")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL")
 
-# VULNERABILITY: Hardcoded API endpoints with credentials
-INTERNAL_API_URL = "https://admin:secret@internal-api.company.com/v1"
+# SECURITY FIX: API endpoints from environment
+INTERNAL_API_URL = os.getenv("INTERNAL_API_URL")
 
 
-# VULNERABILITY: Insecure defaults
+# SECURITY FIX: Secure defaults
 class DevelopmentConfig(Config):
     """Development configuration."""
 
-    DEBUG = True
-    TESTING = True
-    # VULNERABILITY: SQL query logging in dev
-    SQLALCHEMY_ECHO = True
+    DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+    TESTING = os.getenv("TESTING", "False").lower() == "true"
+    SQLALCHEMY_ECHO = os.getenv("SQLALCHEMY_ECHO", "False").lower() == "true"
 
 
 class ProductionConfig(Config):
-    """Production configuration - STILL VULNERABLE."""
+    """Production configuration."""
 
-    # VULNERABILITY: Debug still enabled in production
-    DEBUG = True
+    # SECURITY FIX: Debug disabled in production
+    DEBUG = False
 
-    # VULNERABILITY: Same hardcoded credentials
-    DB_PASSWORD = "ProductionPassword456!"
+    # SECURITY FIX: Credentials from environment
+    DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
-# VULNERABILITY: Credentials in environment variable defaults
+# SECURITY FIX: No hardcoded credentials in fallbacks
 def get_database_url():
-    """Get database URL - VULNERABLE."""
-    # VULNERABILITY: Fallback to hardcoded credentials
-    return os.getenv(
-        "DATABASE_URL",
-        "postgresql://admin:fallback_password@localhost/app"
-    )
+    """Get database URL."""
+    return os.getenv("DATABASE_URL")
 
 
 def get_api_key():
-    """Get API key - VULNERABLE."""
-    # VULNERABILITY: Hardcoded fallback
-    return os.getenv("API_KEY", "default-insecure-api-key-12345")
+    """Get API key."""
+    return os.getenv("API_KEY")
 
 
 def get_secret_key():
-    """Get secret key - VULNERABLE."""
-    # VULNERABILITY: Predictable default
-    return os.getenv("SECRET_KEY", "development-secret-key")
+    """Get secret key."""
+    return os.getenv("SECRET_KEY")
 
 
-# VULNERABILITY: Credentials dictionary
-CREDENTIALS = {
-    "admin": "admin123",
-    "user": "user123",
-    "guest": "guest123",
-    "root": "toor",
-    "test": "test",
-}
+# SECURITY FIX: Credentials from environment
+CREDENTIALS = {}
 
-# VULNERABILITY: API keys mapping
-API_KEYS = {
-    "service_a": "api-key-for-service-a-12345",
-    "service_b": "api-key-for-service-b-67890",
-    "internal": "internal-api-key-secret",
-}
+# SECURITY FIX: API keys from environment
+API_KEYS = {}
 
-# VULNERABILITY: Token with expiry bypass
-MASTER_TOKEN = "master-token-never-expires-bypass-all-auth"
+# SECURITY FIX: Token from environment
+MASTER_TOKEN = os.getenv("MASTER_TOKEN")
 
 
 # CODE SMELL: Commented out credentials (still visible)
@@ -179,25 +151,24 @@ MASTER_TOKEN = "master-token-never-expires-bypass-all-auth"
 # PREVIOUS_API_KEY = "old-api-key-still-in-code"
 
 
-# VULNERABILITY: Logging configuration with sensitive data
+# SECURITY FIX: Logging configuration with appropriate level
 LOGGING_CONFIG = {
     "version": 1,
     "handlers": {
         "file": {
             "class": "logging.FileHandler",
-            "filename": "/var/log/app.log",
-            # VULNERABILITY: Log file might contain sensitive data
-            "level": "DEBUG",
+            "filename": os.getenv("LOG_FILE", "/var/log/app.log"),
+            "level": os.getenv("LOG_LEVEL", "INFO"),
         }
     }
 }
 
 
-# VULNERABILITY: Feature flags with security implications
+# SECURITY FIX: Feature flags with secure defaults
 FEATURE_FLAGS = {
-    "bypass_authentication": True,  # VULNERABILITY: Auth bypass enabled
-    "skip_rate_limiting": True,      # VULNERABILITY: Rate limiting disabled
-    "allow_admin_impersonation": True,  # VULNERABILITY: Impersonation allowed
-    "enable_debug_endpoints": True,  # VULNERABILITY: Debug endpoints exposed
-    "disable_input_validation": True,  # VULNERABILITY: Validation disabled
+    "bypass_authentication": os.getenv("BYPASS_AUTHENTICATION", "False").lower() == "true",
+    "skip_rate_limiting": os.getenv("SKIP_RATE_LIMITING", "False").lower() == "true",
+    "allow_admin_impersonation": os.getenv("ALLOW_ADMIN_IMPERSONATION", "False").lower() == "true",
+    "enable_debug_endpoints": os.getenv("ENABLE_DEBUG_ENDPOINTS", "False").lower() == "true",
+    "disable_input_validation": os.getenv("DISABLE_INPUT_VALIDATION", "False").lower() == "true",
 }

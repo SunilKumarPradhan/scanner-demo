@@ -21,9 +21,12 @@ function validatePassword(password) {
 function performSearch() {
     var searchInput = document.getElementById('searchInput').value;
 
-    // VULNERABILITY: Direct innerHTML assignment with user input
-    document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+    // SECURITY FIX: Use textContent instead of innerHTML to prevent XSS
+    var searchResultsElement = document.getElementById('searchResults');
+    var searchParagraph = document.createElement('p');
+    searchParagraph.textContent = 'You searched for: ' + searchInput;
+    searchResultsElement.innerHTML = '';
+    searchResultsElement.appendChild(searchParagraph);
 
     // VULNERABILITY: Constructing URL with user input
     var url = API_URL + '/search?q=' + searchInput;
@@ -39,9 +42,9 @@ function performSearch() {
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        // VULNERABILITY: eval with URL data
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        // SECURITY FIX: Remove eval and use textContent to prevent code injection
+        var content = hash;
+        document.getElementById('userContent').textContent = content;
     }
 }
 window.onhashchange = loadContentFromHash;
@@ -95,11 +98,17 @@ function redirectTo(url) {
     window.location.href = url;
 }
 
-// VULNERABILITY: postMessage without origin check
+// SECURITY FIX: Validate postMessage origin and remove eval
 window.addEventListener('message', function(event) {
-    // VULNERABILITY: No origin verification
+    var allowedOrigins = ['https://trusted-domain.com', 'https://another-trusted.com'];
+    if (allowedOrigins.indexOf(event.origin) === -1) {
+        return;
+    }
     var data = event.data;
-    eval(data.code);  // CRITICAL: eval with message data
+    // SECURITY FIX: Process data safely without eval
+    if (data && typeof data === 'object') {
+        console.log('Received safe message:', data);
+    }
 });
 
 // VULNERABILITY: Unused variables (code smell)
@@ -129,10 +138,10 @@ function calculateTotal2(items) {
     return total;
 }
 
-// VULNERABILITY: Hardcoded credentials
+// SECURITY FIX: Remove hardcoded credentials - use environment variables or secure configuration
 var adminCredentials = {
-    username: "admin",
-    password: "admin123"
+    username: process.env.ADMIN_USERNAME || "",
+    password: process.env.ADMIN_PASSWORD || ""
 };
 
 // VULNERABILITY: Console.log in production code
