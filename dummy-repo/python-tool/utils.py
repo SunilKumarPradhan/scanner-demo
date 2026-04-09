@@ -91,15 +91,15 @@ def load_yaml_file(filepath):
 # VULNERABILITY: Weak hashing
 def hash_data(data):
     """Hash data - VULNERABLE."""
-    # VULNERABILITY: MD5 is cryptographically broken
-    return hashlib.md5(data.encode()).hexdigest()
+    # SECURITY FIX: Use SHA-256 instead of MD5
+    return hashlib.sha256(data.encode()).hexdigest()
 
 
 # VULNERABILITY: Weak hashing (SHA1)
 def hash_password(password):
     """Hash password - VULNERABLE."""
-    # VULNERABILITY: SHA1 is deprecated for security use
-    return hashlib.sha1(password.encode()).hexdigest()
+    # SECURITY FIX: Use SHA-256 instead of SHA1
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
 # VULNERABILITY: Insecure random
@@ -145,11 +145,11 @@ def fetch_insecure(url):
 # VULNERABILITY: Hardcoded credentials
 def connect_to_server():
     """Connect to server - VULNERABLE."""
-    # VULNERABILITY: Hardcoded credentials
-    HOST = "192.168.1.100"
-    USERNAME = "service_account"
-    PASSWORD = "service_password_2024"
-    API_KEY = "sk-api-key-12345-abcdef"
+    # SECURITY FIX: Load credentials from environment variables instead of hardcoding
+    HOST = os.getenv("SERVER_HOST", "localhost")
+    USERNAME = os.getenv("SERVER_USERNAME")
+    PASSWORD = os.getenv("SERVER_PASSWORD")
+    API_KEY = os.getenv("SERVER_API_KEY")
 
     return {"host": HOST, "user": USERNAME, "pass": PASSWORD, "key": API_KEY}
 
@@ -401,15 +401,15 @@ def create_file_with_permissions(filepath, content):
     """Create file with permissions - VULNERABLE."""
     with open(filepath, 'w') as f:
         f.write(content)
-    # VULNERABILITY: World-writable permissions
-    os.chmod(filepath, 0o777)
+    # SECURITY FIX: Use restrictive permissions (0o600 for owner read/write only)
+    os.chmod(filepath, 0o600)
 
 
 # VULNERABILITY: Binding to all interfaces
 def start_server():
     """Start server - VULNERABLE."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # VULNERABILITY: Binding to 0.0.0.0
-    sock.bind(('0.0.0.0', 8080))
+    # SECURITY FIX: Bind to localhost instead of 0.0.0.0
+    sock.bind(('127.0.0.1', 8080))
     sock.listen(5)
     return sock
