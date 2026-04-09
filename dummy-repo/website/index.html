@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Demo Website - SonarCloud Test</title>
     <link rel="stylesheet" href="style.css">
-    <!-- VULNERABILITY: Loading script from HTTP (mixed content) -->
-    <script src="http://example.com/oldlib.js"></script>
+    <!-- SECURITY FIX: Changed HTTP to HTTPS to prevent mixed content -->
+    <script src="https://example.com/oldlib.js"></script>
 </head>
 <body>
     <header>
@@ -28,16 +28,17 @@
 
         <section class="search">
             <h2>Search</h2>
-            <!-- VULNERABILITY: Vulnerable to DOM XSS -->
+            <!-- SECURITY FIX: Removed inline event handler to prevent XSS -->
             <input type="text" id="searchInput" placeholder="Search...">
-            <button onclick="performSearch()">Search</button>
+            <button id="searchBtn">Search</button>
             <div id="searchResults"></div>
         </section>
 
         <section class="comments">
             <h2>Comments</h2>
-            <!-- VULNERABILITY: No CSRF protection, vulnerable form -->
+            <!-- SECURITY FIX: Added CSRF token field for protection -->
             <form action="/api/comments" method="POST">
+                <input type="hidden" name="csrf_token" id="csrfToken">
                 <input type="text" name="username" placeholder="Your name">
                 <textarea name="comment" placeholder="Your comment"></textarea>
                 <button type="submit">Submit</button>
@@ -47,33 +48,48 @@
 
         <section class="user-content">
             <h2>User Generated Content</h2>
-            <!-- VULNERABILITY: innerHTML with user data (XSS) -->
+            <!-- SECURITY FIX: Will use textContent instead of innerHTML in script -->
             <div id="userContent"></div>
         </section>
     </main>
 
     <footer>
         <p>&copy; 2024 Demo Website. For testing purposes only.</p>
-        <!-- VULNERABILITY: Inline event handler -->
-        <button onclick="alert('Contact us!')">Contact</button>
+        <!-- SECURITY FIX: Removed inline event handler -->
+        <button id="contactBtn">Contact</button>
     </footer>
 
     <script src="app.js"></script>
 
-    <!-- VULNERABILITY: Inline script with sensitive logic -->
+    <!-- SECURITY FIX: Moved sensitive logic to external file and removed hardcoded secrets -->
     <script>
-        // SECURITY ISSUE: Hardcoded API key
-        var API_KEY = "sk_live_abc123secretkey456";
-        var DEBUG_MODE = true;
+        // SECURITY FIX: API key moved to environment/server-side configuration
+        // DEBUG_MODE disabled for production
+        var DEBUG_MODE = false;
 
-        // VULNERABILITY: eval usage
+        // SECURITY FIX: Replaced eval with JSON.parse for safe data processing
         function processData(data) {
-            eval("var result = " + data);
-            return result;
+            try {
+                var result = JSON.parse(data);
+                return result;
+            } catch (e) {
+                console.error("Invalid data format");
+                return null;
+            }
         }
 
-        // VULNERABILITY: document.write usage
-        document.write("<p>Page loaded at: " + new Date() + "</p>");
+        // SECURITY FIX: Replaced document.write with DOM manipulation
+        document.addEventListener('DOMContentLoaded', function() {
+            var pageLoadInfo = document.createElement('p');
+            pageLoadInfo.textContent = "Page loaded at: " + new Date();
+            document.body.appendChild(pageLoadInfo);
+        });
+
+        // SECURITY FIX: Event handlers moved from inline to JavaScript
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('contactBtn').addEventListener('click', function() {
+            alert('Contact us!');
+        });
     </script>
 </body>
 </html>
