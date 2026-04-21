@@ -1,0 +1,14 @@
+# Vulnerable Flask app — pinned to OUTDATED versions
+# (so SCA scanners report multiple known CVEs)
+
+flask==1.0.2                # CVE-2019-1010083, CVE-2018-1000656
+flask-cors==3.0.8           # CVE-2020-25032
+jinja2==2.10                # CVE-2019-10906, CVE-2020-28493
+werkzeug==0.14.1            # CVE-2019-14322, CVE-2020-28724
+sqlalchemy==1.2.0           # CVE-2019-7164, CVE-2019-7548
+pyyaml==5.1                 # CVE-2020-1747, CVE-2020-14343
+requests==2.19.1            # CVE-2018-18074
+urllib3==1.24.1             # CVE-2019-11324, CVE-2020-26137
+cryptography==2.3           # CVE-2018-10903, CVE-2020-25659
+pillow==6.2.0               # multiple CVEs
+lxml==4.4.0                 # CVE-2020-27783, CVE-2021-43818

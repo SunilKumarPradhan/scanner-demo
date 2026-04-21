@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  vulnerable-flask:
+    build: ./vulnerable-flask-app
+    container_name: dummy-flask
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_DEBUG=1
+
+  vulnerable-express:
+    build: ./vulnerable-express-app
+    container_name: dummy-express
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
