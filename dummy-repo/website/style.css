@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Demo Website Styles */
 
 
@@ -21,7 +21,6 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
-    max-width: 1200px; /* Duplicate */
 }
 
 /* Header Styles */
@@ -132,6 +131,7 @@ nav a:hover {
     border-radius: 10px;
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid #eee;
 }
 
 .feature-card:hover {
@@ -360,14 +360,6 @@ footer p {
 }
 
 
-.unused-class {
-}
-
-
-.feature-card {
-    border: 1px solid #eee;
-}
-
 /* Utility Classes */
 
 .mt-1 { margin-top: 0.25rem !important; }
@@ -419,24 +411,16 @@ footer p {
     }
 }
 
-
-/*
-.old-feature {
-    display: none;
-    background: red;
-}
-*/
-
-
 .custom-spacing {
     margin: 17px 23px 31px 47px;
     padding: 13px;
     line-height: 1.847;
 }
 
-
 .weird-colors {
     color: #ABC;
     background: rgb(123, 45, 67);
     border-color: hsl(120, 50%, 50%);
 }
+</style>
+</custom_file>

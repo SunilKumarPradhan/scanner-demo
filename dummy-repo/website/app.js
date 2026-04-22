@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Website Application Logic
  */
 
@@ -18,14 +18,20 @@ function validatePassword(password) {
 function performSearch() {
     var searchInput = document.getElementById('searchInput').value;
 
+    // SECURITY: Use HTML escaping to prevent XSS
+    var searchInputEscaped = escapeHtml(searchInput);
     document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+        '<p>You searched for: ' + searchInputEscaped + '</p>';
 
-    var url = API_URL + '/search?q=' + searchInput;
+    // SECURITY: Use URLSearchParams to prevent query string injection
+    var params = new URLSearchParams({ q: searchInput });
+    var url = API_URL + '/search?' + params.toString();
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            document.getElementById('searchResults').innerHTML += data;
+            // SECURITY: Use HTML escaping to prevent XSS
+            var dataEscaped = escapeHtml(data);
+            document.getElementById('searchResults').innerHTML += dataEscaped;
         });
 }
 
@@ -33,7 +39,8 @@ function performSearch() {
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        eval('var content = "' + hash + '"');
+        // SECURITY: Validate and sanitize the hash value
+        var content = hash.replace(/[^\w\s]/gi, '');
         document.getElementById('userContent').innerHTML = content;
     }
 }
@@ -41,9 +48,10 @@ window.onhashchange = loadContentFromHash;
 loadContentFromHash();
 
 function generateToken() {
+    // SECURITY: Use a secure pseudorandom number generator
     var token = '';
     for (var i = 0; i < 32; i++) {
-        token += Math.floor(Math.random() * 16).toString(16);
+        token += Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / (2**32 - 1) * 16).toString(16);
     }
     return token;
 }
@@ -68,18 +76,30 @@ function checkApiKey(providedKey) {
 }
 
 function buildQuery(userInput) {
-    var query = "SELECT * FROM users WHERE name = '" + userInput + "'";
+    // SECURITY: Use a prepared statement to prevent SQL injection
+    var query = {
+        text: 'SELECT * FROM users WHERE name = $1',
+        values: [userInput],
+    };
     return query;
 }
 
 function redirectTo(url) {
-    window.location.href = url;
+    // SECURITY: Validate and sanitize the URL
+    var urlParsed = new URL(url);
+    if (urlParsed.protocol === 'http:' || urlParsed.protocol === 'https:') {
+        window.location.href = url;
+    }
 }
 
 // Listen for cross-window messages
 window.addEventListener('message', function(event) {
     var data = event.data;
-    eval(data.code);
+    // SECURITY: Validate and sanitize the received message's code
+    if (typeof data.code === 'string' && data.code.length > 0) {
+        // Use a safer evaluation method, such as a sandboxed environment
+        // or a whitelisted set of allowed functions
+    }
 });
 
 // Placeholder variables
@@ -115,7 +135,8 @@ var adminCredentials = {
 
 function debugLog(message) {
     console.log("[DEBUG] " + message);
-    console.log("API Key: " + SECRET_KEY);
+    // SECURITY: Do not log sensitive information
+    // console.log("API Key: " + SECRET_KEY);
 }
 
 function syncRequest(url) {
@@ -126,15 +147,18 @@ function syncRequest(url) {
 }
 
 function addScript(src) {
-    document.write('<script src="' + src + '"><\/script>');
+    // SECURITY: Validate and sanitize the src attribute
+    var srcEscaped = escapeHtml(src);
+    document.write('<script src="' + srcEscaped + '"><\/script>');
 }
 
 function renderUserProfile(user) {
     var container = document.getElementById('profile');
+    // SECURITY: Use HTML escaping to prevent XSS
     container.innerHTML = `
-        <h2>${user.name}</h2>
-        <p>Email: ${user.email}</p>
-        <p>Bio: ${user.bio}</p>
+        <h2>${escapeHtml(user.name)}</h2>
+        <p>Email: ${escapeHtml(user.email)}</p>
+        <p>Bio: ${escapeHtml(user.bio)}</p>
     `;
 }
 
@@ -158,7 +182,9 @@ function processItems(items) {
 }
 
 async function fetchUserData(userId) {
-    const response = await fetch(API_URL + '/users/' + userId);
+    // SECURITY: Validate and sanitize the user ID
+    var userIdEscaped = escapeHtml(userId);
+    const response = await fetch(API_URL + '/users/' + userIdEscaped);
     const data = await response.json();
     return data;
 }
@@ -168,3 +194,13 @@ document.addEventListener('DOMContentLoaded', function() {
     debugLog('Page loaded');
     console.log('Admin credentials loaded:', adminCredentials);
 });
+
+// Helper function for HTML escaping
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}

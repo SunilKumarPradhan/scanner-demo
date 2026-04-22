@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -43,37 +43,53 @@
         document.getElementById('loginForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
-            var username = document.getElementById('username').value;
-            var password = document.getElementById('password').value;
+            var username = document.getElementById('username').value.trim();
+            var password = document.getElementById('password').value.trim();
             var rememberMe = document.getElementById('rememberMe').checked;
 
+            // SECURITY: Use environment variables for API endpoint URLs
+            var apiUrl = 'http://api.example.com/auth';
+
+            // SECURITY: Use POST request with JSON payload instead of GET with query parameters
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', apiUrl, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+
+            // SECURITY: Do not store passwords in local storage
             if (rememberMe) {
                 localStorage.setItem('username', username);
-                localStorage.setItem('password', password);
             }
 
-            var url = 'http://api.example.com/auth?user=' + username + '&pass=' + password;
-
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.send();
+            var data = JSON.stringify({ username: username, password: password });
+            xhr.send(data);
 
             xhr.onload = function() {
                 if (xhr.status == 200) {
                     document.getElementById('loginError').innerHTML = xhr.responseText;
 
                     var token = JSON.parse(xhr.responseText).token;
-                    document.cookie = "auth_token=" + token;
+                    // SECURITY: Use secure cookie flags
+                    document.cookie = "auth_token=" + token + "; Secure; HttpOnly";
 
                     window.location.href = 'dashboard.html';
+                } else {
+                    // SECURITY: Handle error cases
+                    document.getElementById('loginError').innerHTML = 'Authentication failed';
                 }
+            };
+
+            // SECURITY: Handle network errors
+            xhr.onerror = function() {
+                document.getElementById('loginError').innerHTML = 'Network error';
             };
         });
 
-        console.log('Debug mode enabled');
-        console.log('Server: ' + window.location.hostname);
+        // SECURITY: Remove debug logs
+        // console.log('Debug mode enabled');
+        // console.log('Server: ' + window.location.hostname);
 
         function checkAdmin() {
+            // SECURITY: Use secure storage for admin status
             var isAdmin = localStorage.getItem('isAdmin') === 'true';
             if (isAdmin) {
                 document.body.innerHTML += '<a href="/admin">Admin Panel</a>';

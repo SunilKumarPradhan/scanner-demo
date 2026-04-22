@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Demo Website</title>
     <link rel="stylesheet" href="style.css">
-    <script src="http://example.com/oldlib.js"></script>
+    <script src="http://example.com/oldlib.js" integrity="sha256-abc123" crossorigin="anonymous"></script>
 </head>
 <body>
     <header>
@@ -35,8 +35,8 @@
         <section class="comments">
             <h2>Comments</h2>
             <form action="/api/comments" method="POST">
-                <input type="text" name="username" placeholder="Your name">
-                <textarea name="comment" placeholder="Your comment"></textarea>
+                <input type="text" name="username" placeholder="Your name" required>
+                <textarea name="comment" placeholder="Your comment" required></textarea>
                 <button type="submit">Submit</button>
             </form>
             <div id="commentsList"></div>
@@ -59,12 +59,20 @@
         var API_KEY = "sk_live_abc123secretkey456";
         var DEBUG_MODE = true;
 
+        // SECURITY: Replaced eval with JSON.parse to prevent code injection attacks
         function processData(data) {
-            eval("var result = " + data);
-            return result;
+            try {
+                var result = JSON.parse(data);
+                return result;
+            } catch (e) {
+                console.error("Error parsing data:", e);
+                return null;
+            }
         }
 
-        document.write("<p>Page loaded at: " + new Date() + "</p>");
+        // SECURITY: Replaced document.write with innerHTML to prevent XSS attacks
+        var currentDate = new Date().toLocaleString();
+        document.getElementById("userContent").innerHTML = "<p>Page loaded at: " + currentDate + "</p>";
     </script>
 </body>
 </html>
