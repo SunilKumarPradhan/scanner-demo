@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+﻿FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -9,7 +9,6 @@ COPY . .
 
 EXPOSE 5000
 
-# VULNERABILITY: running as root in container
 ENV FLASK_APP=main.py
 ENV FLASK_ENV=development
 

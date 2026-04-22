@@ -1,4 +1,4 @@
-// VULNERABILITY (CWE-798): hardcoded credentials in source
+﻿// Application configuration
 
 module.exports = {
   // Cookie / session signing

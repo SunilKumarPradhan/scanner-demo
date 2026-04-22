@@ -1,4 +1,4 @@
-FROM node:18-alpine
+﻿FROM node:18-alpine
 
 WORKDIR /app
 
@@ -9,5 +9,4 @@ COPY . .
 
 EXPOSE 3000
 
-# VULNERABILITY: running as root
 CMD ["node", "server.js"]

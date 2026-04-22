@@ -1,9 +1,5 @@
-"""
-services/db.py — raw database driver (deliberately vulnerable).
-
-This file is the **sink** for SQL injection.  The context_gatherer_node
-should trace from /login → routes/auth.py → services/user_service.py →
-services/db.py to see the full data flow.
+﻿"""
+services/db.py -- raw database driver.
 """
 
 import sqlite3
@@ -24,7 +20,7 @@ def get_conn() -> sqlite3.Connection:
 
 
 def execute_raw(sql: str) -> list[dict]:
-    """Execute an arbitrary SQL string  this is the SQLi sink."""
+    """Execute a SQL string and return results."""
     cur = get_conn().cursor()
     cur.execute(sql)
     if cur.description:
@@ -35,7 +31,7 @@ def execute_raw(sql: str) -> list[dict]:
 
 
 def find_user_by_credentials(username: str, password: str) -> dict | None:
-    """VULNERABILITY (CWE-89): SQL injection via string concatenation."""
+    """Find a user by username and password."""
     sql = (
         "SELECT id, username, email, role FROM users "
         f"WHERE username = '{username}' AND password = '{password}'"
@@ -45,14 +41,14 @@ def find_user_by_credentials(username: str, password: str) -> dict | None:
 
 
 def find_user_by_id(user_id: str) -> dict | None:
-    """VULNERABILITY (CWE-89): SQL injection via f-string."""
+    """Find a user by ID."""
     sql = f"SELECT * FROM users WHERE id = {user_id}"
     results = execute_raw(sql)
     return results[0] if results else None
 
 
 def search_products(query: str, order_by: str = "name") -> list[dict]:
-    """VULNERABILITY (CWE-89): SQLi in both WHERE and ORDER BY."""
+    """Search products by name with optional sort."""
     sql = (
         f"SELECT * FROM products WHERE name LIKE '%{query}%' "
         f"ORDER BY {order_by}"
@@ -61,18 +57,18 @@ def search_products(query: str, order_by: str = "name") -> list[dict]:
 
 
 def update_user_field(user_id: str, field: str, value: str) -> None:
-    """VULNERABILITY (CWE-89): unrestricted column name + value."""
+    """Update a single field on a user record."""
     sql = f"UPDATE users SET {field} = '{value}' WHERE id = {user_id}"
     execute_raw(sql)
 
 
 def delete_user(user_id: str) -> None:
-    """VULNERABILITY (CWE-89): SQLi in DELETE."""
+    """Delete a user by ID."""
     sql = f"DELETE FROM users WHERE id = {user_id}"
     execute_raw(sql)
 
 
 def store_password_plaintext(user_id: str, password: str) -> None:
-    """VULNERABILITY (CWE-256): plaintext password storage."""
+    """Update the password for a user."""
     sql = f"UPDATE users SET password = '{password}' WHERE id = {user_id}"
     execute_raw(sql)

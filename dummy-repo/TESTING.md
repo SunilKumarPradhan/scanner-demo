@@ -282,7 +282,7 @@ Evolution Engine: 1 cycles (1 committed, 0 rolled back)
 | `langmem` not found | Optional — graph falls back to `InMemoryStore` automatically |
 | WebSocket disconnects mid-iteration | The graph is sync; we run it in `run_in_executor`. If still disconnecting, lower `max_iterations` in the project config |
 | AGP evolution never fires | Check logs — it only triggers when `fix_success_rate < 50%` *or* `avg_confidence < 0.5`. Use a weak/cheap model to force this |
-| Stack-trace leaking in production | That's the point — the demo's error handler is intentionally vulnerable (CWE-209) |
+| Stack-trace leaking in production | The demo error handler exposes stack traces — this is expected behaviour for the test target |
 
 ---
 

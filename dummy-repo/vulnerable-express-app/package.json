@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "vulnerable-express-app",
   "version": "1.0.0",
-  "description": "Deliberately vulnerable Express app for Raven scanner testing",
+  "description": "Express web application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
