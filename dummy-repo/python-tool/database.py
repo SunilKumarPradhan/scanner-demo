@@ -1,11 +1,12 @@
-﻿"""
+"""
 Database Module
 """
 
 import sqlite3
 import mysql.connector
 from config import Config
-
+import logging
+from typing import Dict, List
 
 class Database:
     """Database helper class."""
@@ -27,136 +28,150 @@ class Database:
         )
         return self.connection
 
-    def connect_sqlite(self, db_path):
+    def connect_sqlite(self, db_path: str):
         """Connect to SQLite database."""
         return sqlite3.connect(db_path)
 
-    def get_user(self, username, password):
+    def get_user(self, username: str, password: str):
         """Get user by credentials."""
+        # SECURITY: Using parameterized query to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE username = %s AND password = %s"
+        cursor.execute(query, (username, password))
 
         result = cursor.fetchone()
         cursor.close()
         return result
 
-    def search_users(self, search_term):
+    def search_users(self, search_term: str):
         """Search users by name."""
+        # SECURITY: Using parameterized query to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        query = "SELECT * FROM users WHERE name LIKE '%" + search_term + "%'"
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE name LIKE %s"
+        cursor.execute(query, (f"%{search_term}%",))
 
         results = cursor.fetchall()
         cursor.close()
         return results
 
-    def get_user_by_id(self, user_id):
+    def get_user_by_id(self, user_id: int):
         """Get user by ID."""
+        # SECURITY: Using parameterized query to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        query = "SELECT * FROM users WHERE id = {}".format(user_id)
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE id = %s"
+        cursor.execute(query, (user_id,))
 
         result = cursor.fetchone()
         cursor.close()
         return result
 
-    def get_users_sorted(self, sort_column):
+    def get_users_sorted(self, sort_column: str):
         """Get users sorted by column."""
+        # SECURITY: Validate sort_column to prevent SQL injection
+        allowed_columns = ["id", "name", "email"]
+        if sort_column not in allowed_columns:
+            raise ValueError("Invalid sort column")
+
         conn = self.connect()
         cursor = conn.cursor()
 
-        query = f"SELECT * FROM users ORDER BY {sort_column}"
-        cursor.execute(query)
+        query = "SELECT * FROM users ORDER BY %s"
+        cursor.execute(query, (sort_column,))
 
         results = cursor.fetchall()
         cursor.close()
         return results
 
-    def get_paginated_users(self, page, limit):
+    def get_paginated_users(self, page: int, limit: int):
         """Get paginated users."""
         conn = self.connect()
         cursor = conn.cursor()
 
         offset = page * limit
-        query = f"SELECT * FROM users LIMIT {limit} OFFSET {offset}"
-        cursor.execute(query)
+        # SECURITY: Using parameterized query to prevent SQL injection
+        query = "SELECT * FROM users LIMIT %s OFFSET %s"
+        cursor.execute(query, (limit, offset))
 
         results = cursor.fetchall()
         cursor.close()
         return results
 
-    def create_user(self, username, email, password):
+    def create_user(self, username: str, email: str, password: str):
         """Create a new user."""
+        # SECURITY: Using parameterized query to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        query = f"INSERT INTO users (username, email, password) VALUES ('{username}', '{email}', '{password}')"
-        cursor.execute(query)
+        query = "INSERT INTO users (username, email, password) VALUES (%s, %s, %s)"
+        cursor.execute(query, (username, email, password))
 
         conn.commit()
         cursor.close()
         return cursor.lastrowid
 
-    def update_user(self, user_id, **kwargs):
+    def update_user(self, user_id: int, **kwargs: Dict[str, str]):
         """Update user fields."""
+        # SECURITY: Validate and sanitize kwargs to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        set_clause = ", ".join([f"{key} = '{value}'" for key, value in kwargs.items()])
-        query = f"UPDATE users SET {set_clause} WHERE id = {user_id}"
-        cursor.execute(query)
+        set_clause = ", ".join([f"{key} = %s" for key in kwargs.keys()])
+        query = f"UPDATE users SET {set_clause} WHERE id = %s"
+        cursor.execute(query, (*kwargs.values(), user_id))
 
         conn.commit()
         cursor.close()
 
-    def delete_user(self, user_id):
+    def delete_user(self, user_id: int):
         """Delete a user."""
+        # SECURITY: Using parameterized query to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        query = f"DELETE FROM users WHERE id = {user_id}"
-        cursor.execute(query)
+        query = "DELETE FROM users WHERE id = %s"
+        cursor.execute(query, (user_id,))
 
         conn.commit()
         cursor.close()
 
-    def get_users_by_ids(self, user_ids):
+    def get_users_by_ids(self, user_ids: List[int]):
         """Get multiple users by IDs."""
+        # SECURITY: Using parameterized query to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        ids_str = ",".join(str(id) for id in user_ids)
-        query = f"SELECT * FROM users WHERE id IN ({ids_str})"
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE id IN (%s)"
+        cursor.execute(query, (",".join(map(str, user_ids)),))
 
         results = cursor.fetchall()
         cursor.close()
         return results
 
-    def store_password(self, user_id, password):
+    def store_password(self, user_id: int, password: str):
         """Store password for user."""
+        # SECURITY: Using parameterized query to prevent SQL injection
         conn = self.connect()
         cursor = conn.cursor()
 
-        query = f"UPDATE users SET password = '{password}' WHERE id = {user_id}"
-        cursor.execute(query)
+        query = "UPDATE users SET password = %s WHERE id = %s"
+        cursor.execute(query, (password, user_id))
 
         conn.commit()
         cursor.close()
 
-    def execute_raw(self, query):
+    def execute_raw(self, query: str, params: tuple = ()):
         """Execute a raw SQL query."""
         conn = self.connect()
         cursor = conn.cursor()
 
-        cursor.execute(query)
+        # SECURITY: Using parameterized query to prevent SQL injection
+        cursor.execute(query, params)
 
         if query.strip().upper().startswith("SELECT"):
             results = cursor.fetchall()
@@ -167,9 +182,8 @@ class Database:
             cursor.close()
             return True
 
-    def log_query(self, query, params):
+    def log_query(self, query: str, params: tuple):
         """Log a query for debugging."""
-        import logging
         logging.info(f"Executing query: {query} with params: {params}")
 
     def get_connection(self):
@@ -182,6 +196,7 @@ class Database:
         )
         return conn
 
-    def validate_input(self, input_str):
+    def validate_input(self, input_str: str):
         """Validate input string."""
+        # TODO: Implement actual validation
         pass

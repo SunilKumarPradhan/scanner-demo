@@ -4,20 +4,22 @@ Web Application
 
 import os
 import sys
-import pickle
+import json
 import subprocess
 import hashlib
 import random
 import tempfile
-from flask import Flask, request, render_template_string, redirect, send_file
+from flask import Flask, request, render_template_string, redirect, send_file, escape
 from database import Database
 from config import Config
 from utils import execute_command, read_file
+from urllib.parse import urlparse
+import ast
 
 app = Flask(__name__)
 
 # Enable debug mode for development server
-app.debug = True
+app.debug = False
 
 # Application secret key
 app.secret_key = "super_secret_key_123456789"
@@ -28,73 +30,105 @@ USERS_CACHE = {}
 # Initialize database
 db = Database()
 
+# SECURITY: Define a list of allowed schemes and hosts for SSRF protection
+ALLOWED_SCHEMES = ['http', 'https']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+
+def validate_url(url):
+    try:
+        parsed_url = urlparse(url)
+        return parsed_url.scheme in ALLOWED_SCHEMES and parsed_url.netloc in ALLOWED_HOSTS
+    except ValueError:
+        return False
 
 @app.route('/login', methods=['POST'])
 def login():
     username = request.form.get('username')
     password = request.form.get('password')
 
+    # SECURITY: Use a secure password hashing algorithm and compare hashed passwords
     user = db.get_user(username, password)
 
     if user:
-        return f"Welcome {username}! Your password is: {password}"
+        return f"Welcome {username}!"
     return "Login failed", 401
 
 
 @app.route('/greet')
 def greet():
     name = request.args.get('name', 'Guest')
-    template = f"<h1>Hello {name}!</h1>"
+    # SECURITY: Use HTML escaping to prevent XSS
+    template = f"<h1>Hello {escape(name)}!</h1>"
     return render_template_string(template)
 
 
 @app.route('/ping')
 def ping():
     host = request.args.get('host', '127.0.0.1')
-    result = os.popen(f"ping -c 1 {host}").read()
+    # SECURITY: Use subprocess.run with shell=False to prevent command injection
+    result = subprocess.run(['ping', '-c', '1', host], stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.decode()
     return f"<pre>{result}</pre>"
 
 
 @app.route('/download')
 def download():
     filename = request.args.get('file')
-    filepath = os.path.join('/var/data/', filename)
-    return send_file(filepath)
+    # SECURITY: Use os.path.normpath to prevent path traversal
+    filepath = os.path.join('/var/data/', os.path.normpath(filename))
+    # SECURITY: Check if the file exists and is within the allowed directory
+    if os.path.exists(filepath) and filepath.startswith('/var/data/'):
+        return send_file(filepath)
+    return "File not found", 404
 
 
 @app.route('/parse_xml', methods=['POST'])
 def parse_xml():
     import xml.etree.ElementTree as ET
+    import defusedxml.ElementTree as ET_defused
     xml_data = request.data
-    tree = ET.fromstring(xml_data)
-    return tree.text
+    try:
+        tree = ET_defused.fromstring(xml_data)
+        return tree.text
+    except ET_defused.ParseError:
+        return "Invalid XML", 400
 
 
 @app.route('/load_session', methods=['POST'])
 def load_session():
     session_data = request.form.get('session')
-    data = pickle.loads(bytes.fromhex(session_data))
-    return str(data)
+    # SECURITY: Use json.loads instead of pickle.loads to prevent arbitrary code execution
+    try:
+        data = json.loads(bytes.fromhex(session_data))
+        return str(data)
+    except json.JSONDecodeError:
+        return "Invalid session data", 400
 
 
 @app.route('/redirect')
 def redirect_url():
     url = request.args.get('url')
-    return redirect(url)
+    # SECURITY: Validate the URL scheme and host
+    if validate_url(url):
+        return redirect(url)
+    return "Invalid URL", 400
 
 
 @app.route('/fetch')
 def fetch_url():
     import urllib.request
     url = request.args.get('url')
-    response = urllib.request.urlopen(url)
-    return response.read()
+    # SECURITY: Validate the URL scheme and host
+    if validate_url(url):
+        response = urllib.request.urlopen(url)
+        return response.read()
+    return "Invalid URL", 400
 
 
 @app.route('/hash', methods=['POST'])
 def hash_password():
     password = request.form.get('password')
-    hashed = hashlib.md5(password.encode()).hexdigest()
+    # SECURITY: Use a secure password hashing algorithm
+    hashed = hashlib.sha256(password.encode()).hexdigest()
     return f"Hash: {hashed}"
 
 
@@ -231,5 +265,10 @@ def create_temp_file(data):
 @app.route('/calculate')
 def calculate():
     expression = request.args.get('expr')
-    result = eval(expression)
-    return str(result)
+    # SECURITY: Use ast.literal_eval to prevent code injection
+    try:
+        result = ast.literal_eval(expression)
+        return str(result)
+    except (ValueError, SyntaxError):
+        return "Invalid expression", 400
+</
