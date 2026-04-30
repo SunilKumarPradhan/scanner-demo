@@ -1,29 +1,29 @@
-﻿// Application configuration
+// Application configuration
 
 module.exports = {
   // Cookie / session signing
-  COOKIE_SECRET: 'cookie-secret-do-not-share',
+  COOKIE_SECRET: process.env.COOKIE_SECRET,
 
   // JWT
-  JWT_SECRET: 'super-jwt-secret-12345',
+  JWT_SECRET: process.env.JWT_SECRET,
 
   // Database
-  DB_HOST: 'prod-db.internal.example.com',
-  DB_USER: 'root',
-  DB_PASSWORD: 'r00t-Pa$$w0rd',
-  DB_NAME: 'production',
+  DB_HOST: process.env.DB_HOST || 'localhost',
+  DB_USER: process.env.DB_USER,
+  DB_PASSWORD: process.env.DB_PASSWORD,
+  DB_NAME: process.env.DB_NAME || 'development',
 
   // Cloud / 3rd-party
-  AWS_ACCESS_KEY_ID: 'AKIAIOSFODNN7EXAMPLE',
-  AWS_SECRET_ACCESS_KEY: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-  STRIPE_KEY: 'sk_demo_4eC39HqLyjWDarjtT1zdp7dc',
-  SENDGRID_API_KEY: 'SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  GITHUB_PAT: 'ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-  SLACK_TOKEN: 'xoxb-FAKE-TOKEN-FOR-TESTING-DEMO',
+  AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+  AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+  STRIPE_KEY: process.env.STRIPE_KEY,
+  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
+  GITHUB_PAT: process.env.GITHUB_PAT,
+  SLACK_TOKEN: process.env.SLACK_TOKEN,
 
   // Misc
-  ADMIN_USERNAME: 'admin',
-  ADMIN_PASSWORD: 'admin123',
+  ADMIN_USERNAME: process.env.ADMIN_USERNAME,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
 
-  DEBUG: true,
+  DEBUG: process.env.DEBUG === 'true',
 };

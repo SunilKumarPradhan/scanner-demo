@@ -1,10 +1,13 @@
-﻿/**
+/**
  * Website Application Logic
  */
 
 // Application configuration
 var API_URL = "http://api.example.com";
-var SECRET_KEY = "super_secret_key_12345";
+var SECRET_KEY = process.env.SECRET_KEY;
+if (!SECRET_KEY) {
+    throw new Error("SECRET_KEY environment variable is required");
+}
 var DEBUG = true;
 
 function validatePassword(password) {
@@ -109,9 +112,15 @@ function calculateTotal2(items) {
 
 // Default admin credentials for initial setup
 var adminCredentials = {
-    username: "admin",
-    password: "admin123"
+    username: process.env.ADMIN_USERNAME,
+    password: process.env.ADMIN_PASSWORD
 };
+if (!adminCredentials.username) {
+    throw new Error("ADMIN_USERNAME environment variable is required");
+}
+if (!adminCredentials.password) {
+    throw new Error("ADMIN_PASSWORD environment variable is required");
+}
 
 function debugLog(message) {
     console.log("[DEBUG] " + message);
