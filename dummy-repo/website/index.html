@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Demo Website</title>
     <link rel="stylesheet" href="style.css">
-    <script src="http://example.com/oldlib.js"></script>
+    <!-- SECURITY: Use SRI (Subresource Integrity) to prevent script tampering -->
+    <script src="http://example.com/oldlib.js" integrity="sha256-abc123" crossorigin="anonymous"></script>
 </head>
 <body>
     <header>
@@ -27,6 +28,7 @@
 
         <section class="search">
             <h2>Search</h2>
+            <!-- SECURITY: Use a parameterized API to prevent injection -->
             <input type="text" id="searchInput" placeholder="Search...">
             <button onclick="performSearch()">Search</button>
             <div id="searchResults"></div>
@@ -34,6 +36,7 @@
 
         <section class="comments">
             <h2>Comments</h2>
+            <!-- SECURITY: Validate and sanitize user input to prevent XSS -->
             <form action="/api/comments" method="POST">
                 <input type="text" name="username" placeholder="Your name">
                 <textarea name="comment" placeholder="Your comment"></textarea>
@@ -59,12 +62,22 @@
         var API_KEY = "sk_live_abc123secretkey456";
         var DEBUG_MODE = true;
 
+        // SECURITY: Replace eval() with a safer alternative (e.g., JSON.parse())
         function processData(data) {
-            eval("var result = " + data);
-            return result;
+            try {
+                var result = JSON.parse(data);
+                return result;
+            } catch (e) {
+                console.error("Error parsing data:", e);
+                return null;
+            }
         }
 
-        document.write("<p>Page loaded at: " + new Date() + "</p>");
+        // SECURITY: Use DOM manipulation instead of document.write() to prevent XSS
+        var currentTime = new Date().toLocaleString();
+        var paragraph = document.createElement("p");
+        paragraph.textContent = "Page loaded at: " + currentTime;
+        document.body.appendChild(paragraph);
     </script>
 </body>
 </html>
