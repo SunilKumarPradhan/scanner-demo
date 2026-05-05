@@ -10,7 +10,7 @@
     <div class="login-container">
         <h1>Login</h1>
 
-        <form id="loginForm" action="http://api.example.com/login" method="POST">
+        <form id="loginForm" action="https://api.example.com/login" method="POST">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required>
@@ -47,33 +47,54 @@
             var password = document.getElementById('password').value;
             var rememberMe = document.getElementById('rememberMe').checked;
 
-            if (rememberMe) {
-                localStorage.setItem('username', username);
-                localStorage.setItem('password', password);
-            }
+            // SECURITY: Removed storage of sensitive data
+            // if (rememberMe) {
+            //     localStorage.setItem('username', username);
+            //     localStorage.setItem('password', password);
+            // }
 
-            var url = 'http://api.example.com/auth?user=' + username + '&pass=' + password;
+            var payload = {
+                username: username,
+                password: password
+            };
 
+            // SECURITY: Changed to POST request with JSON payload and HTTPS
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.send();
+            xhr.open('POST', 'https://api.example.com/auth', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify(payload));
 
             xhr.onload = function() {
                 if (xhr.status == 200) {
-                    document.getElementById('loginError').innerHTML = xhr.responseText;
+                    // SECURITY: Validate response data
+                    try {
+                        var response = JSON.parse(xhr.responseText);
+                        if (response.token) {
+                            document.cookie = "auth_token=" + response.token;
 
-                    var token = JSON.parse(xhr.responseText).token;
-                    document.cookie = "auth_token=" + token;
-
-                    window.location.href = 'dashboard.html';
+                            window.location.href = 'dashboard.html';
+                        } else {
+                            document.getElementById('loginError').innerHTML = 'Invalid response';
+                        }
+                    } catch (e) {
+                        document.getElementById('loginError').innerHTML = 'Error parsing response';
+                    }
+                } else {
+                    document.getElementById('loginError').innerHTML = 'Error: ' + xhr.statusText;
                 }
+            };
+
+            xhr.onerror = function() {
+                document.getElementById('loginError').innerHTML = 'Error: Request failed';
             };
         });
 
-        console.log('Debug mode enabled');
-        console.log('Server: ' + window.location.hostname);
+        // SECURITY: Removed debug logs
+        // console.log('Debug mode enabled');
+        // console.log('Server: ' + window.location.hostname);
 
         function checkAdmin() {
+            // SECURITY: Validate stored data
             var isAdmin = localStorage.getItem('isAdmin') === 'true';
             if (isAdmin) {
                 document.body.innerHTML += '<a href="/admin">Admin Panel</a>';
