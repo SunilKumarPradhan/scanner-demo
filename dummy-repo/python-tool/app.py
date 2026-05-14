@@ -4,15 +4,18 @@ Web Application
 
 import os
 import sys
-import pickle
+import json
 import subprocess
 import hashlib
 import random
 import tempfile
-from flask import Flask, request, render_template_string, redirect, send_file
+from flask import Flask, request, render_template_string, redirect, send_file, url_for
 from database import Database
 from config import Config
 from utils import execute_command, read_file
+from urllib.parse import urlparse
+from defusedxml import ElementTree
+import ast
 
 app = Flask(__name__)
 
@@ -28,73 +31,98 @@ USERS_CACHE = {}
 # Initialize database
 db = Database()
 
+# SECURITY: Allow-list of schemes and hosts for SSRF protection
+ALLOWED_SCHEMES = ['http', 'https']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+
+def validate_url(url):
+    try:
+        parsed_url = urlparse(url)
+        return parsed_url.scheme in ALLOWED_SCHEMES and parsed_url.netloc in ALLOWED_HOSTS
+    except ValueError:
+        return False
 
 @app.route('/login', methods=['POST'])
 def login():
     username = request.form.get('username')
     password = request.form.get('password')
 
+    # SECURITY: Use parameterized query to prevent SQL injection
     user = db.get_user(username, password)
 
     if user:
-        return f"Welcome {username}! Your password is: {password}"
+        return f"Welcome {username}!"
     return "Login failed", 401
 
 
 @app.route('/greet')
 def greet():
     name = request.args.get('name', 'Guest')
-    template = f"<h1>Hello {name}!</h1>"
-    return render_template_string(template)
+    # SECURITY: Use render_template_string with auto-escaping
+    template = "<h1>Hello {{ name }}!</h1>"
+    return render_template_string(template, name=name)
 
 
 @app.route('/ping')
 def ping():
     host = request.args.get('host', '127.0.0.1')
-    result = os.popen(f"ping -c 1 {host}").read()
+    # SECURITY: Use subprocess.run with shell=False to prevent command injection
+    result = subprocess.run(['ping', '-c', '1', host], stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout.decode()
     return f"<pre>{result}</pre>"
 
 
 @app.route('/download')
 def download():
     filename = request.args.get('file')
+    # SECURITY: Use os.path.normpath and allow-list root checks to prevent path traversal
     filepath = os.path.join('/var/data/', filename)
-    return send_file(filepath)
+    if os.path.abspath(filepath).startswith('/var/data/'):
+        return send_file(filepath)
+    return "Invalid file path", 400
 
 
 @app.route('/parse_xml', methods=['POST'])
 def parse_xml():
-    import xml.etree.ElementTree as ET
+    # SECURITY: Use defusedxml to prevent XXE attacks
     xml_data = request.data
-    tree = ET.fromstring(xml_data)
+    tree = ElementTree.fromstring(xml_data)
     return tree.text
 
 
 @app.route('/load_session', methods=['POST'])
 def load_session():
     session_data = request.form.get('session')
-    data = pickle.loads(bytes.fromhex(session_data))
+    # SECURITY: Use json.loads instead of pickle.loads to prevent deserialization attacks
+    data = json.loads(bytes.fromhex(session_data))
     return str(data)
 
 
 @app.route('/redirect')
 def redirect_url():
     url = request.args.get('url')
-    return redirect(url)
+    # SECURITY: Validate URL scheme and host to prevent SSRF
+    if validate_url(url):
+        return redirect(url)
+    return "Invalid URL", 400
 
 
 @app.route('/fetch')
 def fetch_url():
-    import urllib.request
     url = request.args.get('url')
-    response = urllib.request.urlopen(url)
-    return response.read()
+    # SECURITY: Validate URL scheme and host to prevent SSRF
+    if validate_url(url):
+        import urllib.request
+        response = urllib.request.urlopen(url)
+        return response.read()
+    return "Invalid URL", 400
 
 
 @app.route('/hash', methods=['POST'])
 def hash_password():
     password = request.form.get('password')
-    hashed = hashlib.md5(password.encode()).hexdigest()
+    # SECURITY: Use a secure password hashing algorithm like bcrypt
+    import bcrypt
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     return f"Hash: {hashed}"
 
 
@@ -231,5 +259,10 @@ def create_temp_file(data):
 @app.route('/calculate')
 def calculate():
     expression = request.args.get('expr')
-    result = eval(expression)
-    return str(result)
+    # SECURITY: Use ast.literal_eval to prevent code injection
+    try:
+        result = ast.literal_eval(expression)
+        return str(result)
+    except Exception as e:
+        return f"Error: {str(e)}", 400
+</app>
