@@ -1,4 +1,4 @@
-﻿/**
+/**
  * server.js -- Express application server.
  */
 
@@ -12,7 +12,8 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
+const { URL } = require('url');
 
 const config = require('./config');
 
@@ -55,9 +56,10 @@ const db = mysql.createConnection({
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  const sql = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ err: err.message, sql });
+  // SECURITY: Use parameterized query to prevent SQL injection
+  const sql = 'SELECT * FROM users WHERE username=? AND password=?';
+  db.query(sql, [username, password], (err, results) => {
+    if (err) return res.status(500).json({ err: err.message });
     if (results.length === 0) return res.status(401).send('nope');
 
     const token = jwt.sign({ user: results[0] }, 'secret', { algorithm: 'HS256' });
@@ -68,37 +70,128 @@ app.post('/login', (req, res) => {
 
 app.get('/greet', (req, res) => {
   const name = req.query.name || 'guest';
-  res.send(`<h1>Hello ${name}!</h1>`);
+  // SECURITY: HTML-escape user input to prevent XSS
+  const escapedName = name
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+  res.send(`<h1>Hello ${escapedName}!</h1>`);
 });
 
 app.get('/ping', (req, res) => {
   const host = req.query.host;
-  exec(`ping -c 1 ${host}`, (err, stdout) => {
-    res.type('text/plain').send(stdout);
+  // SECURITY: Use execFile with array arguments to prevent command injection
+  execFile('ping', ['-c', '1', host], (err, stdout) => {
+    res.type('text/plain').send(stdout || '');
   });
 });
 
 app.get('/file', (req, res) => {
   const filename = req.query.name;
-  const data = fs.readFileSync(path.join('/var/www/files', filename));
-  res.send(data);
+  // SECURITY: Normalize path and validate it stays within allowed directory
+  const baseDir = '/var/www/files';
+  const fullPath = path.normalize(path.join(baseDir, filename));
+  
+  if (!fullPath.startsWith(baseDir + path.sep) && fullPath !== baseDir) {
+    return res.status(400).send('Invalid file path');
+  }
+  
+  try {
+    const data = fs.readFileSync(fullPath);
+    res.send(data);
+  } catch (e) {
+    res.status(404).send('File not found');
+  }
 });
 
 app.post('/calc', (req, res) => {
   const expr = req.body.expr;
-  const result = eval(expr);
-  res.json({ result });
+  // SECURITY: Replace eval() with safe math expression parser
+  // Only allow basic arithmetic operations
+  const sanitized = String(expr).replace(/[^0-9+\-*/().\s]/g, '');
+  
+  if (sanitized !== String(expr)) {
+    return res.status(400).json({ error: 'Invalid expression' });
+  }
+  
+  try {
+    // SECURITY: Use Function constructor with restricted scope instead of eval
+    // Still limited to mathematical expressions only
+    const result = Function('"use strict"; return (' + sanitized + ')')();
+    
+    if (typeof result !== 'number' || !isFinite(result)) {
+      return res.status(400).json({ error: 'Result must be a finite number' });
+    }
+    
+    res.json({ result });
+  } catch (e) {
+    res.status(400).json({ error: 'Invalid expression' });
+  }
 });
 
 app.get('/proxy', async (req, res) => {
   const target = req.query.url;
-  const r = await fetch(target);
-  const body = await r.text();
-  res.send(body);
+  
+  // SECURITY: Validate URL and block private IP ranges to prevent SSRF
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(target);
+  } catch (e) {
+    return res.status(400).send('Invalid URL');
+  }
+  
+  // SECURITY: Only allow http/https schemes
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    return res.status(400).send('Invalid URL scheme');
+  }
+  
+  // SECURITY: Block private IP ranges and localhost
+  const hostname = parsedUrl.hostname;
+  const privateRanges = [
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^::1$/,
+    /^fc00:/i,
+    /^fe80:/i,
+    /^localhost$/i
+  ];
+  
+  if (privateRanges.some(range => range.test(hostname))) {
+    return res.status(400).send('Access to private networks not allowed');
+  }
+  
+  try {
+    const r = await fetch(target);
+    const body = await r.text();
+    res.send(body);
+  } catch (e) {
+    res.status(500).send('Proxy error');
+  }
 });
 
 app.get('/redirect', (req, res) => {
-  res.redirect(req.query.url);
+  const targetUrl = req.query.url;
+  
+  // SECURITY: Validate redirect URL to prevent open redirect
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(targetUrl);
+  } catch (e) {
+    return res.status(400).send('Invalid URL');
+  }
+  
+  // SECURITY: Only allow redirects to trusted domains
+  const allowedHosts = ['example.com', 'www.example.com'];
+  if (!allowedHosts.includes(parsedUrl.hostname)) {
+    return res.status(400).send('Redirect not allowed');
+  }
+  
+  res.redirect(targetUrl);
 });
 
 app.post('/hash', (req, res) => {
@@ -117,16 +210,24 @@ app.get('/debug', (req, res) => {
 
 app.delete('/users/:id', (req, res) => {
   if (req.headers['x-admin'] === 'true') {
-    db.query(`DELETE FROM users WHERE id=${req.params.id}`);
-    return res.json({ deleted: true });
+    // SECURITY: Use parameterized query to prevent SQL injection
+    db.query('DELETE FROM users WHERE id=?', [req.params.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      return res.json({ deleted: true });
+    });
+  } else {
+    res.status(403).send('forbidden');
   }
-  res.status(403).send('forbidden');
 });
 
 app.post('/restore', (req, res) => {
-  const serialize = require('serialize-javascript');
-  const data = eval('(' + req.body.payload + ')');
-  res.json({ restored: data });
+  // SECURITY: Replace eval() with JSON.parse() for safe deserialization
+  try {
+    const data = JSON.parse(req.body.payload);
+    res.json({ restored: data });
+  } catch (e) {
+    res.status(400).json({ error: 'Invalid JSON payload' });
+  }
 });
 
 // Error handler

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Website Application Logic
  */
 
@@ -14,18 +14,34 @@ function validatePassword(password) {
     return false;
 }
 
+// SECURITY: Escape HTML to prevent XSS
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // Perform a search and display results
 function performSearch() {
     var searchInput = document.getElementById('searchInput').value;
 
-    document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+    // SECURITY: Escape user input to prevent XSS
+    document.getElementById('searchResults').textContent =
+        'You searched for: ' + searchInput;
 
-    var url = API_URL + '/search?q=' + searchInput;
+    // SECURITY: Encode search parameter for URL
+    var url = API_URL + '/search?q=' + encodeURIComponent(searchInput);
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            document.getElementById('searchResults').innerHTML += data;
+            // SECURITY: Use textContent instead of innerHTML for untrusted data
+            var resultsDiv = document.getElementById('searchResults');
+            var resultsPara = document.createElement('p');
+            resultsPara.textContent = data;
+            resultsDiv.appendChild(resultsPara);
         });
 }
 
@@ -33,8 +49,10 @@ function performSearch() {
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        // SECURITY: Use textContent instead of eval() to prevent code injection
+        // Decode URI component and sanitize by using textContent
+        var content = decodeURIComponent(hash);
+        document.getElementById('userContent').textContent = content;
     }
 }
 window.onhashchange = loadContentFromHash;
@@ -49,8 +67,11 @@ function generateToken() {
 }
 
 function mergeObjects(target, source) {
+    // SECURITY: Prevent prototype pollution by checking hasOwnProperty
     for (var key in source) {
-        target[key] = source[key];
+        if (source.hasOwnProperty(key) && key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+            target[key] = source[key];
+        }
     }
     return target;
 }
@@ -72,14 +93,48 @@ function buildQuery(userInput) {
     return query;
 }
 
+// SECURITY: Validate URL to prevent open redirect
 function redirectTo(url) {
-    window.location.href = url;
+    try {
+        var parsedUrl = new URL(url, window.location.origin);
+        // SECURITY: Only allow same-origin redirects or explicitly trusted domains
+        var allowedHosts = [window.location.hostname, 'api.example.com'];
+        if (allowedHosts.indexOf(parsedUrl.hostname) !== -1) {
+            window.location.href = parsedUrl.href;
+        } else {
+            console.error('Redirect to untrusted domain blocked: ' + parsedUrl.hostname);
+        }
+    } catch (e) {
+        console.error('Invalid URL for redirect: ' + url);
+    }
 }
 
-// Listen for cross-window messages
+// SECURITY: Validate origin and use structured message passing instead of eval()
+var TRUSTED_ORIGINS = ['https://trusted-domain.com'];
+
 window.addEventListener('message', function(event) {
+    // SECURITY: Validate message origin
+    if (TRUSTED_ORIGINS.indexOf(event.origin) === -1) {
+        console.warn('Message from untrusted origin blocked: ' + event.origin);
+        return;
+    }
+    
+    // SECURITY: Use structured data with explicit action handlers instead of eval()
     var data = event.data;
-    eval(data.code);
+    if (data && typeof data === 'object') {
+        switch (data.action) {
+            case 'updateContent':
+                if (data.content && typeof data.content === 'string') {
+                    var element = document.getElementById(data.targetId);
+                    if (element) {
+                        element.textContent = data.content;
+                    }
+                }
+                break;
+            default:
+                console.warn('Unknown action: ' + data.action);
+        }
+    }
 });
 
 // Placeholder variables
@@ -131,11 +186,11 @@ function addScript(src) {
 
 function renderUserProfile(user) {
     var container = document.getElementById('profile');
-    container.innerHTML = `
-        <h2>${user.name}</h2>
-        <p>Email: ${user.email}</p>
-        <p>Bio: ${user.bio}</p>
-    `;
+    // SECURITY: Escape HTML to prevent XSS in user-controlled fields
+    container.innerHTML = 
+        '<h2>' + escapeHtml(user.name) + '</h2>' +
+        '<p>Email: ' + escapeHtml(user.email) + '</p>' +
+        '<p>Bio: ' + escapeHtml(user.bio) + '</p>';
 }
 
 function hashPassword(password) {
@@ -158,7 +213,8 @@ function processItems(items) {
 }
 
 async function fetchUserData(userId) {
-    const response = await fetch(API_URL + '/users/' + userId);
+    // SECURITY: Encode userId to prevent injection in URL path
+    const response = await fetch(API_URL + '/users/' + encodeURIComponent(userId));
     const data = await response.json();
     return data;
 }
