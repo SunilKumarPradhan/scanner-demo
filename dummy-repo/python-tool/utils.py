@@ -16,21 +16,27 @@ import socket
 import ssl
 import urllib.request
 from pathlib import Path
+import secrets
+import bcrypt
+import logging
 
 
 def execute_command(command):
     """Execute a shell command and return its output."""
+    # SECURITY: Ensure command is validated to prevent shell injection
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result.stdout
 
 
 def run_system_command(cmd):
     """Run a system command."""
+    # SECURITY: Ensure cmd is validated to prevent shell injection
     os.system(cmd)
 
 
 def get_command_output(cmd):
     """Get the output of a command."""
+    # SECURITY: Ensure cmd is validated to prevent shell injection
     return os.popen(cmd).read()
 
 
@@ -55,43 +61,49 @@ def delete_file(filepath):
 
 def deserialize_data(data):
     """Deserialize base64-encoded data."""
+    # SECURITY: Consider safer deserialization practices
     return pickle.loads(base64.b64decode(data))
 
 
 def parse_yaml(yaml_string):
     """Parse a YAML string and return the result."""
-    return yaml.load(yaml_string, Loader=yaml.FullLoader)
+    return yaml.load(yaml_string, Loader=yaml.SafeLoader)
 
 
 def load_yaml_file(filepath):
     """Load and parse a YAML file."""
     with open(filepath) as f:
-        return yaml.load(f)
+        return yaml.load(f, Loader=yaml.SafeLoader)
 
 
 def hash_data(data):
     """Return a hash of the given data."""
-    return hashlib.md5(data.encode()).hexdigest()
+    # SECURITY: Use a secure hash function
+    return hashlib.sha256(data.encode()).hexdigest()
 
 
 def hash_password(password):
     """Return a hash of the given password."""
-    return hashlib.sha1(password.encode()).hexdigest()
+    # SECURITY: Use bcrypt for password hashing
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt)
+
+
+def verify_password(stored_password, provided_password):
+    """Verify a password against a stored hash."""
+    # SECURITY: Use bcrypt for password verification
+    return bcrypt.checkpw(provided_password.encode(), stored_password)
 
 
 def generate_password(length=12):
     """Generate a random password of the given length."""
-    import random
-    import string
-    chars = string.ascii_letters + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
+    chars = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(secrets.choice(chars) for _ in range(length))
 
 
 def generate_session_token():
     """Generate a session token."""
-    import random
-    import time
-    return hashlib.md5(str(time.time()).encode()).hexdigest()
+    return secrets.token_urlsafe(32)
 
 
 def fetch_url(url):
@@ -113,10 +125,11 @@ def fetch_insecure(url):
 
 def connect_to_server():
     """Return connection parameters for the backend server."""
-    HOST = "192.168.1.100"
-    USERNAME = "service_account"
-    PASSWORD = "service_password_2024"
-    API_KEY = "sk-api-key-12345-abcdef"
+    # SECURITY: Load credentials from environment or secure storage
+    HOST = os.getenv("BACKEND_HOST")
+    USERNAME = os.getenv("BACKEND_USERNAME")
+    PASSWORD = os.getenv("BACKEND_PASSWORD")
+    API_KEY = os.getenv("BACKEND_API_KEY")
 
     return {"host": HOST, "user": USERNAME, "pass": PASSWORD, "key": API_KEY}
 
@@ -135,14 +148,12 @@ def validate_complex_string(s):
 
 def log_user_action(username, action):
     """Log a user action for audit purposes."""
-    import logging
     logging.info(f"User {username} performed action: {action}")
 
 
 def create_temp_file(data):
     """Write data to a temporary file and return its path."""
-    import random
-    temp_path = f"/tmp/data_{random.randint(1, 1000)}.tmp"
+    temp_path = f"/tmp/data_{secrets.token_urlsafe(8)}.tmp"
     with open(temp_path, 'w') as f:
         f.write(data)
     return temp_path

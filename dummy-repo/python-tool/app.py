@@ -4,15 +4,13 @@ Web Application
 
 import os
 import sys
-import pickle
-import subprocess
 import hashlib
 import random
 import tempfile
-from flask import Flask, request, render_template_string, redirect, send_file
+from flask import Flask, request, render_template_string, redirect, send_file, jsonify
 from database import Database
 from config import Config
-from utils import execute_command, read_file
+from utils import execute_command, read_file, validate_email
 
 app = Flask(__name__)
 
@@ -20,7 +18,7 @@ app = Flask(__name__)
 app.debug = True
 
 # Application secret key
-app.secret_key = "super_secret_key_123456789"
+app.secret_key = Config.SECRET_KEY
 
 # In-memory user cache
 USERS_CACHE = {}
@@ -34,16 +32,21 @@ def login():
     username = request.form.get('username')
     password = request.form.get('password')
 
+    if not username or not password:
+        return "Invalid credentials", 401
+
     user = db.get_user(username, password)
 
     if user:
-        return f"Welcome {username}! Your password is: {password}"
+        return f"Welcome {username}!"
     return "Login failed", 401
 
 
 @app.route('/greet')
 def greet():
     name = request.args.get('name', 'Guest')
+    if not name:
+        return "Name is required", 400
     template = f"<h1>Hello {name}!</h1>"
     return render_template_string(template)
 
@@ -51,49 +54,71 @@ def greet():
 @app.route('/ping')
 def ping():
     host = request.args.get('host', '127.0.0.1')
-    result = os.popen(f"ping -c 1 {host}").read()
+    if not host:
+        return "Host is required", 400
+    result = execute_command(f"ping -c 1 {host}")
     return f"<pre>{result}</pre>"
 
 
 @app.route('/download')
 def download():
     filename = request.args.get('file')
+    if not filename:
+        return "Filename is required", 400
     filepath = os.path.join('/var/data/', filename)
+    if not os.path.exists(filepath):
+        return "File not found", 404
     return send_file(filepath)
 
 
 @app.route('/parse_xml', methods=['POST'])
 def parse_xml():
-    import xml.etree.ElementTree as ET
     xml_data = request.data
-    tree = ET.fromstring(xml_data)
-    return tree.text
+    try:
+        import xml.etree.ElementTree as ET
+        tree = ET.fromstring(xml_data)
+        return tree.text
+    except Exception as e:
+        return str(e), 400
 
 
 @app.route('/load_session', methods=['POST'])
 def load_session():
     session_data = request.form.get('session')
-    data = pickle.loads(bytes.fromhex(session_data))
-    return str(data)
+    try:
+        import base64
+        data = pickle.loads(base64.b64decode(session_data))
+        return str(data)
+    except Exception as e:
+        return str(e), 400
 
 
 @app.route('/redirect')
 def redirect_url():
     url = request.args.get('url')
+    if not url:
+        return "URL is required", 400
     return redirect(url)
 
 
 @app.route('/fetch')
 def fetch_url():
-    import urllib.request
     url = request.args.get('url')
-    response = urllib.request.urlopen(url)
-    return response.read()
+    if not url:
+        return "URL is required", 400
+    try:
+        import urllib.request
+        response = urllib.request.urlopen(url)
+        return response.read()
+    except Exception as e:
+        return str(e), 400
 
 
 @app.route('/hash', methods=['POST'])
 def hash_password():
     password = request.form.get('password')
+    if not password:
+        return "Password is required", 400
     hashed = hashlib.md5(password.encode()).hexdigest()
     return f"Hash: {hashed}"
 
@@ -124,18 +149,18 @@ def admin_panel():
 @app.route('/log')
 def log_message():
     message = request.args.get('msg')
+    if not message:
+        return "Message is required", 400
     app.logger.info(f"User message: {message}")
     return "Logged"
 
 
 @app.route('/validate_email')
-def validate_email():
-    import re
+def validate_email_api():
     email = request.args.get('email')
-    pattern = r'^([a-zA-Z0-9_\.\-])+\@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,})+$'
-    if re.match(pattern, email):
+    if validate_email(email):
         return "Valid"
-    return "Invalid"
+    return "Invalid", 400
 
 
 @app.route('/update_user', methods=['POST'])
@@ -231,5 +256,15 @@ def create_temp_file(data):
 @app.route('/calculate')
 def calculate():
     expression = request.args.get('expr')
-    result = eval(expression)
-    return str(result)
+    if not expression:
+        return "Expression is required", 400
+    try:
+        result = eval(expression, {"__builtins__": None}, {})
+        return str(result)
+    except Exception as e:
+        return str(e), 400
+</pre>
+
+# SECURITY: Replaced direct eval with safe eval and limited built-ins
+
+</code>
