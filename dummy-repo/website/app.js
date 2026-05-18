@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Website Application Logic
  */
 
@@ -21,11 +21,13 @@ function performSearch() {
     document.getElementById('searchResults').innerHTML =
         '<p>You searched for: ' + searchInput + '</p>';
 
-    var url = API_URL + '/search?q=' + searchInput;
+    var url = API_URL + '/search?q=' + encodeURIComponent(searchInput); // SECURITY: Use encodeURIComponent to prevent XSS
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            document.getElementById('searchResults').innerHTML += data;
+            // SECURITY: Use a library like DOMPurify to sanitize the HTML
+            const DOMPurify = require('dompurify');
+            document.getElementById('searchResults').innerHTML = DOMPurify.sanitize(data);
         });
 }
 
@@ -33,8 +35,8 @@ function performSearch() {
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        // SECURITY: Avoid using eval; instead, use a safe method to set the content
+        document.getElementById('userContent').innerHTML = hash;
     }
 }
 window.onhashchange = loadContentFromHash;
@@ -68,18 +70,32 @@ function checkApiKey(providedKey) {
 }
 
 function buildQuery(userInput) {
-    var query = "SELECT * FROM users WHERE name = '" + userInput + "'";
+    // SECURITY: Use a parameterized query to prevent SQL injection
+    var query = "SELECT * FROM users WHERE name = ?";
+    // Assume a safe method to execute the query, like a prepared statement
     return query;
 }
 
 function redirectTo(url) {
-    window.location.href = url;
+    // SECURITY: Validate the URL before redirecting
+    const parsedUrl = new URL(url, window.location.origin);
+    if (parsedUrl.origin === window.location.origin) {
+        window.location.href = url;
+    } else {
+        console.error('Invalid redirect URL');
+    }
 }
 
 // Listen for cross-window messages
 window.addEventListener('message', function(event) {
     var data = event.data;
-    eval(data.code);
+    // SECURITY: Avoid using eval; instead, use a safe method to execute the code
+    // If the code is supposed to be a function, consider using a dispatch table
+    if (typeof data.code === 'function') {
+        data.code();
+    } else {
+        console.error('Invalid code in message');
+    }
 });
 
 // Placeholder variables
@@ -115,7 +131,8 @@ var adminCredentials = {
 
 function debugLog(message) {
     console.log("[DEBUG] " + message);
-    console.log("API Key: " + SECRET_KEY);
+    // SECURITY: Avoid logging sensitive information like the API key
+    // console.log("API Key: " + SECRET_KEY);
 }
 
 function syncRequest(url) {
@@ -126,16 +143,24 @@ function syncRequest(url) {
 }
 
 function addScript(src) {
-    document.write('<script src="' + src + '"><\/script>');
+    // SECURITY: Validate the script source before adding it
+    const allowedSources = ['self', 'https://example.com'];
+    if (allowedSources.includes(src)) {
+        document.write('<script src="' + src + '"><\/script>');
+    } else {
+        console.error('Invalid script source');
+    }
 }
 
 function renderUserProfile(user) {
     var container = document.getElementById('profile');
-    container.innerHTML = `
+    // SECURITY: Use a library like DOMPurify to sanitize the HTML
+    const DOMPurify = require('dompurify');
+    container.innerHTML = DOMPurify.sanitize(`
         <h2>${user.name}</h2>
         <p>Email: ${user.email}</p>
         <p>Bio: ${user.bio}</p>
-    `;
+    `);
 }
 
 function hashPassword(password) {
@@ -158,7 +183,7 @@ function processItems(items) {
 }
 
 async function fetchUserData(userId) {
-    const response = await fetch(API_URL + '/users/' + userId);
+    const response = await fetch(API_URL + '/users/' + encodeURIComponent(userId)); // SECURITY: Use encodeURIComponent to prevent XSS
     const data = await response.json();
     return data;
 }

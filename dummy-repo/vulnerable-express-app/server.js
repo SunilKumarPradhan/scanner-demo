@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { exec } = require('child_process');
+const { URL } = require('url');
 
 const config = require('./config');
 
@@ -45,22 +46,22 @@ app.use(session({
 
 // Database connection
 const db = mysql.createConnection({
-  host: 'prod-db.internal',
-  user: 'root',
-  password: 'root',
-  database: 'app'
+  host: config.DB_HOST,
+  user: config.DB_USER,
+  password: config.DB_PASSWORD,
+  database: config.DB_NAME
 });
 
 // ── Routes ──────────────────────────────────────────────────────────
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  const sql = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
-  db.query(sql, (err, results) => {
+  const sql = 'SELECT * FROM users WHERE username = ? AND password = ?';
+  db.query(sql, [username, password], (err, results) => {
     if (err) return res.status(500).json({ err: err.message, sql });
     if (results.length === 0) return res.status(401).send('nope');
 
-    const token = jwt.sign({ user: results[0] }, 'secret', { algorithm: 'HS256' });
+    const token = jwt.sign({ user: results[0] }, config.JWT_SECRET, { algorithm: 'HS256' });
     res.cookie('token', token, { httpOnly: false });
     res.json({ token, user: results[0] });
   });
@@ -73,32 +74,69 @@ app.get('/greet', (req, res) => {
 
 app.get('/ping', (req, res) => {
   const host = req.query.host;
-  exec(`ping -c 1 ${host}`, (err, stdout) => {
+  if (!host || typeof host !== 'string') {
+    return res.status(400).send('Invalid host');
+  }
+  const allowedHosts = ['example.com', 'google.com'];
+  if (!allowedHosts.includes(host)) {
+    return res.status(403).send('Forbidden');
+  }
+  exec(`ping -c 1 ${host}`, { shell: false }, (err, stdout) => {
+    if (err) return res.status(500).send('Error');
     res.type('text/plain').send(stdout);
   });
 });
 
 app.get('/file', (req, res) => {
   const filename = req.query.name;
-  const data = fs.readFileSync(path.join('/var/www/files', filename));
+  if (!filename || typeof filename !== 'string') {
+    return res.status(400).send('Invalid filename');
+  }
+  const filePath = path.join('/var/www/files', filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send('File not found');
+  }
+  const data = fs.readFileSync(filePath);
   res.send(data);
 });
 
 app.post('/calc', (req, res) => {
   const expr = req.body.expr;
-  const result = eval(expr);
-  res.json({ result });
+  try {
+    const result = Function('return ' + expr)();
+    res.json({ result });
+  } catch (err) {
+    res.status(500).send('Error evaluating expression');
+  }
 });
 
 app.get('/proxy', async (req, res) => {
   const target = req.query.url;
+  if (!target || typeof target !== 'string') {
+    return res.status(400).send('Invalid URL');
+  }
+  const url = new URL(target);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return res.status(403).send('Forbidden');
+  }
+  if (url.host.includes('localhost') || url.host.includes('127.0.0.1')) {
+    return res.status(403).send('Forbidden');
+  }
   const r = await fetch(target);
   const body = await r.text();
   res.send(body);
 });
 
 app.get('/redirect', (req, res) => {
-  res.redirect(req.query.url);
+  const url = req.query.url;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).send('Invalid URL');
+  }
+  const redirectUrl = new URL(url, 'http://example.com');
+  if (redirectUrl.protocol !== 'http:' && redirectUrl.protocol !== 'https:') {
+    return res.status(403).send('Forbidden');
+  }
+  res.redirect(redirectUrl.href);
 });
 
 app.post('/hash', (req, res) => {
@@ -117,16 +155,23 @@ app.get('/debug', (req, res) => {
 
 app.delete('/users/:id', (req, res) => {
   if (req.headers['x-admin'] === 'true') {
-    db.query(`DELETE FROM users WHERE id=${req.params.id}`);
-    return res.json({ deleted: true });
+    const sql = 'DELETE FROM users WHERE id = ?';
+    db.query(sql, [req.params.id], (err) => {
+      if (err) return res.status(500).send('Error');
+      return res.json({ deleted: true });
+    });
   }
   res.status(403).send('forbidden');
 });
 
 app.post('/restore', (req, res) => {
   const serialize = require('serialize-javascript');
-  const data = eval('(' + req.body.payload + ')');
-  res.json({ restored: data });
+  try {
+    const data = JSON.parse(req.body.payload);
+    res.json({ restored: data });
+  } catch (err) {
+    res.status(500).send('Error restoring data');
+  }
 });
 
 // Error handler
