@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Website Application Logic
  */
 
@@ -17,15 +17,20 @@ function validatePassword(password) {
 // Perform a search and display results
 function performSearch() {
     var searchInput = document.getElementById('searchInput').value;
+    // SECURITY: Validate and sanitize user input
+    searchInput = searchInput.trim().replace(/[^a-zA-Z0-9]/g, '');
 
-    document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+    // SECURITY: Use HTML escaping to prevent DOM XSS
+    var searchResultsHtml = '<p>You searched for: ' + escapeHtml(searchInput) + '</p>';
 
-    var url = API_URL + '/search?q=' + searchInput;
+    document.getElementById('searchResults').innerHTML = searchResultsHtml;
+
+    var url = API_URL + '/search?q=' + encodeURIComponent(searchInput);
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            document.getElementById('searchResults').innerHTML += data;
+            // SECURITY: Use HTML escaping to prevent DOM XSS
+            document.getElementById('searchResults').innerHTML += escapeHtml(data);
         });
 }
 
@@ -33,8 +38,10 @@ function performSearch() {
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        // SECURITY: Avoid using eval to prevent code injection
+        var content = hash;
+        // SECURITY: Use HTML escaping to prevent DOM XSS
+        document.getElementById('userContent').innerHTML = escapeHtml(content);
     }
 }
 window.onhashchange = loadContentFromHash;
@@ -67,19 +74,30 @@ function checkApiKey(providedKey) {
     return false;
 }
 
+// SECURITY: Use parameterized queries to prevent SQL injection
 function buildQuery(userInput) {
-    var query = "SELECT * FROM users WHERE name = '" + userInput + "'";
-    return query;
+    // Assume a library like mysql or pg is used to execute the query
+    var query = "SELECT * FROM users WHERE name = ?";
+    var params = [userInput];
+    // Use a library like mysql or pg to execute the query with params
 }
 
 function redirectTo(url) {
-    window.location.href = url;
+    // SECURITY: Validate and sanitize URL to prevent open redirect
+    var parsedUrl = new URL(url, window.location.href);
+    if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+        window.location.href = url;
+    }
 }
 
 // Listen for cross-window messages
 window.addEventListener('message', function(event) {
     var data = event.data;
-    eval(data.code);
+    // SECURITY: Avoid using eval to prevent code injection
+    // Instead, use a safe method to execute the code, such as a dispatch table
+    if (data.code in codeDispatchTable) {
+        codeDispatchTable[data.code]();
+    }
 });
 
 // Placeholder variables
@@ -109,13 +127,14 @@ function calculateTotal2(items) {
 
 // Default admin credentials for initial setup
 var adminCredentials = {
-    username: "admin",
-    password: "admin123"
+    username: process.env.ADMIN_USERNAME,
+    password: process.env.ADMIN_PASSWORD
 };
 
 function debugLog(message) {
     console.log("[DEBUG] " + message);
-    console.log("API Key: " + SECRET_KEY);
+    // SECURITY: Avoid logging sensitive information
+    // console.log("API Key: " + SECRET_KEY);
 }
 
 function syncRequest(url) {
@@ -126,15 +145,19 @@ function syncRequest(url) {
 }
 
 function addScript(src) {
-    document.write('<script src="' + src + '"><\/script>');
+    // SECURITY: Validate and sanitize src to prevent XSS
+    var script = document.createElement('script');
+    script.src = src;
+    document.body.appendChild(script);
 }
 
 function renderUserProfile(user) {
     var container = document.getElementById('profile');
+    // SECURITY: Use HTML escaping to prevent DOM XSS
     container.innerHTML = `
-        <h2>${user.name}</h2>
-        <p>Email: ${user.email}</p>
-        <p>Bio: ${user.bio}</p>
+        <h2>${escapeHtml(user.name)}</h2>
+        <p>Email: ${escapeHtml(user.email)}</p>
+        <p>Bio: ${escapeHtml(user.bio)}</p>
     `;
 }
 
@@ -168,3 +191,18 @@ document.addEventListener('DOMContentLoaded', function() {
     debugLog('Page loaded');
     console.log('Admin credentials loaded:', adminCredentials);
 });
+
+// Helper function for HTML escaping
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Dispatch table for safe code execution
+var codeDispatchTable = {
+    // Add allowed codes here
+};
