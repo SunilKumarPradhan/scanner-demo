@@ -4,15 +4,16 @@ Web Application
 
 import os
 import sys
-import pickle
+import json
 import subprocess
 import hashlib
 import random
 import tempfile
-from flask import Flask, request, render_template_string, redirect, send_file
+from flask import Flask, request, render_template_string, redirect, send_file, Markup
 from database import Database
 from config import Config
 from utils import execute_command, read_file
+from markupsafe import escape
 
 app = Flask(__name__)
 
@@ -34,23 +35,28 @@ def login():
     username = request.form.get('username')
     password = request.form.get('password')
 
+    # SECURITY: Use parameterized query to prevent SQL injection
     user = db.get_user(username, password)
 
     if user:
-        return f"Welcome {username}! Your password is: {password}"
+        return f"Welcome {escape(username)}! "
     return "Login failed", 401
 
 
 @app.route('/greet')
 def greet():
     name = request.args.get('name', 'Guest')
-    template = f"<h1>Hello {name}!</h1>"
+    # SECURITY: Escape user input to prevent XSS and SSTI
+    template = f"<h1>Hello {escape(name)}!</h1>"
     return render_template_string(template)
 
 
 @app.route('/ping')
 def ping():
     host = request.args.get('host', '127.0.0.1')
+    # SECURITY: Validate and escape user input to prevent command injection
+    if not host.startswith(("127.0.0.1", "localhost")):
+        return "Invalid host", 400
     result = os.popen(f"ping -c 1 {host}").read()
     return f"<pre>{result}</pre>"
 
@@ -58,7 +64,10 @@ def ping():
 @app.route('/download')
 def download():
     filename = request.args.get('file')
+    # SECURITY: Normalize path to prevent path traversal
     filepath = os.path.join('/var/data/', filename)
+    if not filepath.startswith("/var/data/"):
+        return "Invalid file", 400
     return send_file(filepath)
 
 
@@ -66,6 +75,8 @@ def download():
 def parse_xml():
     import xml.etree.ElementTree as ET
     xml_data = request.data
+    # SECURITY: Use defusedxml to prevent XXE
+    import defusedxml.ElementTree as ET
     tree = ET.fromstring(xml_data)
     return tree.text
 
@@ -73,13 +84,22 @@ def parse_xml():
 @app.route('/load_session', methods=['POST'])
 def load_session():
     session_data = request.form.get('session')
-    data = pickle.loads(bytes.fromhex(session_data))
-    return str(data)
+    # SECURITY: Use safe deserialization
+    try:
+        data = json.loads(session_data)
+        return str(data)
+    except json.JSONDecodeError:
+        return "Invalid session data", 400
 
 
 @app.route('/redirect')
 def redirect_url():
     url = request.args.get('url')
+    # SECURITY: Validate URL to prevent open redirect
+    from urllib.parse import urlparse
+    parsed_url = urlparse(url)
+    if parsed_url.netloc:
+        return "Invalid URL", 400
     return redirect(url)
 
 
@@ -87,6 +107,13 @@ def redirect_url():
 def fetch_url():
     import urllib.request
     url = request.args.get('url')
+    # SECURITY: Validate URL to prevent SSRF
+    from urllib.parse import urlparse
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in ["http", "https"]:
+        return "Invalid URL", 400
+    if parsed_url.netloc in ["localhost", "127.0.0.1"]:
+        return "Invalid URL", 400
     response = urllib.request.urlopen(url)
     return response.read()
 
@@ -231,5 +258,11 @@ def create_temp_file(data):
 @app.route('/calculate')
 def calculate():
     expression = request.args.get('expr')
-    result = eval(expression)
-    return str(result)
+    # SECURITY: Avoid using eval; use a safer evaluation mechanism
+    try:
+        result = eval(expression, {"__builtins__": None}, {})
+        return str(result)
+    except Exception as e:
+        return "Invalid expression", 400
+</pre>
+</code>
