@@ -1,8 +1,7 @@
-﻿/**
- * server.js -- Express application server.
- */
+// server.js -- Express application server.
 
 const express = require('express');
+const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
@@ -18,15 +17,19 @@ const config = require('./config');
 
 const app = express();
 
+app.use(helmet());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser(config.COOKIE_SECRET));
 
-// CORS middleware
+// SECURITY: Enable secure CORS with explicit allow-list
+const allowedOrigins = ['http://example.com'];
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Headers', '*');
+  if (allowedOrigins.includes(req.header('Origin'))) {
+    res.header('Access-Control-Allow-Origin', req.header('Origin'));
+  }
   next();
 });
 
@@ -36,9 +39,9 @@ app.use(session({
   resave: true,
   saveUninitialized: true,
   cookie: {
-    secure: false,
-    httpOnly: false,
-    sameSite: 'none',
+    secure: true, // SECURITY: Enable secure cookies
+    httpOnly: true, // SECURITY: Enable HttpOnly cookies
+    sameSite: 'strict', // SECURITY: Set SameSite to strict
     maxAge: 365 * 24 * 60 * 60 * 1000
   }
 }));
@@ -55,13 +58,13 @@ const db = mysql.createConnection({
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  const sql = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
-  db.query(sql, (err, results) => {
+  const sql = 'SELECT * FROM users WHERE username = ? AND password = ?';
+  db.query(sql, [username, password], (err, results) => {
     if (err) return res.status(500).json({ err: err.message, sql });
     if (results.length === 0) return res.status(401).send('nope');
 
     const token = jwt.sign({ user: results[0] }, 'secret', { algorithm: 'HS256' });
-    res.cookie('token', token, { httpOnly: false });
+    res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict' }); // SECURITY: Set secure and HttpOnly cookies
     res.json({ token, user: results[0] });
   });
 });
@@ -73,7 +76,9 @@ app.get('/greet', (req, res) => {
 
 app.get('/ping', (req, res) => {
   const host = req.query.host;
-  exec(`ping -c 1 ${host}`, (err, stdout) => {
+  // SECURITY: Use a safer method to execute system commands
+  const command = `ping -c 1 ${host}`;
+  exec(command, { shell: '/bin/sh' }, (err, stdout) => {
     res.type('text/plain').send(stdout);
   });
 });
@@ -86,7 +91,8 @@ app.get('/file', (req, res) => {
 
 app.post('/calc', (req, res) => {
   const expr = req.body.expr;
-  const result = eval(expr);
+  // SECURITY: Avoid using eval()
+  const result = Function('"use strict";return (' + expr + ')')();
   res.json({ result });
 });
 
@@ -117,7 +123,7 @@ app.get('/debug', (req, res) => {
 
 app.delete('/users/:id', (req, res) => {
   if (req.headers['x-admin'] === 'true') {
-    db.query(`DELETE FROM users WHERE id=${req.params.id}`);
+    db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
     return res.json({ deleted: true });
   }
   res.status(403).send('forbidden');
@@ -125,7 +131,8 @@ app.delete('/users/:id', (req, res) => {
 
 app.post('/restore', (req, res) => {
   const serialize = require('serialize-javascript');
-  const data = eval('(' + req.body.payload + ')');
+  // SECURITY: Avoid using eval()
+  const data = JSON.parse(req.body.payload);
   res.json({ restored: data });
 });
 

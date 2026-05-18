@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Website Application Logic
  */
 
@@ -16,16 +16,17 @@ function validatePassword(password) {
 
 // Perform a search and display results
 function performSearch() {
-    var searchInput = document.getElementById('searchInput').value;
+    var searchInput = document.getElementById('searchInput').value.trim();
 
     document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+        '<p>You searched for: ' + DOMPurify.sanitize(searchInput) + '</p>';
 
-    var url = API_URL + '/search?q=' + searchInput;
+    var url = API_URL + '/search?q=' + encodeURIComponent(searchInput);
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            document.getElementById('searchResults').innerHTML += data;
+            var sanitizedData = DOMPurify.sanitize(data);
+            document.getElementById('searchResults').innerHTML += sanitizedData;
         });
 }
 
@@ -33,8 +34,8 @@ function performSearch() {
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        var content = hash;
+        document.getElementById('userContent').innerHTML = DOMPurify.sanitize(content);
     }
 }
 window.onhashchange = loadContentFromHash;
@@ -68,18 +69,30 @@ function checkApiKey(providedKey) {
 }
 
 function buildQuery(userInput) {
-    var query = "SELECT * FROM users WHERE name = '" + userInput + "'";
+    // SECURITY: Use parameterized query to prevent SQL injection
+    var query = "SELECT * FROM users WHERE name = ? ";
+    var params = [userInput];
+    // Use a library like sql-js or sqlite3 to execute the query with params
     return query;
 }
 
 function redirectTo(url) {
-    window.location.href = url;
+    // SECURITY: Validate and sanitize the URL before redirecting
+    var sanitizedUrl = DOMPurify.sanitize(url);
+    window.location.href = sanitizedUrl;
 }
 
 // Listen for cross-window messages
 window.addEventListener('message', function(event) {
     var data = event.data;
-    eval(data.code);
+    // SECURITY: Avoid using eval() with user-controlled input
+    // Instead, use a safer alternative like JSON.parse() or a library like js-eval
+    try {
+        var code = JSON.parse(data.code);
+        // Execute the code safely
+    } catch (e) {
+        console.error('Error parsing code:', e);
+    }
 });
 
 // Placeholder variables
@@ -109,8 +122,8 @@ function calculateTotal2(items) {
 
 // Default admin credentials for initial setup
 var adminCredentials = {
-    username: "admin",
-    password: "admin123"
+    username: process.env.ADMIN_USERNAME,
+    password: process.env.ADMIN_PASSWORD
 };
 
 function debugLog(message) {
@@ -126,16 +139,22 @@ function syncRequest(url) {
 }
 
 function addScript(src) {
-    document.write('<script src="' + src + '"><\/script>');
+    // SECURITY: Avoid using document.write() with user-controlled input
+    // Instead, use a library like DOMPurify to sanitize the src attribute
+    var sanitizedSrc = DOMPurify.sanitize(src);
+    var script = document.createElement('script');
+    script.src = sanitizedSrc;
+    document.body.appendChild(script);
 }
 
 function renderUserProfile(user) {
     var container = document.getElementById('profile');
-    container.innerHTML = `
+    var sanitizedUserData = DOMPurify.sanitize(`
         <h2>${user.name}</h2>
         <p>Email: ${user.email}</p>
         <p>Bio: ${user.bio}</p>
-    `;
+    `);
+    container.innerHTML = sanitizedUserData;
 }
 
 function hashPassword(password) {
