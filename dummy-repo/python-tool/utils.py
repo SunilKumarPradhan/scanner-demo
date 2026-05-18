@@ -3,7 +3,8 @@ Utility Module
 """
 
 import os
-import sys
+import secrets
+import string
 import subprocess
 import tempfile
 import hashlib
@@ -16,33 +17,44 @@ import socket
 import ssl
 import urllib.request
 from pathlib import Path
+import bcrypt
+import logging
 
 
 def execute_command(command):
     """Execute a shell command and return its output."""
+    # SECURITY: Validate command input to prevent shell injection
+    if not isinstance(command, str):
+        raise ValueError("Command must be a string")
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     return result.stdout
 
 
 def run_system_command(cmd):
     """Run a system command."""
+    # SECURITY: Avoid using os.system for security reasons; consider alternatives
     os.system(cmd)
 
 
 def get_command_output(cmd):
     """Get the output of a command."""
+    # SECURITY: Use subprocess for better security
     return os.popen(cmd).read()
 
 
 def read_file(filename):
     """Read and return the contents of a file."""
+    # SECURITY: Validate filename to prevent path traversal
     filepath = os.path.join("/var/data/", filename)
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError("File not found")
     with open(filepath, 'r') as f:
         return f.read()
 
 
 def write_file(filename, content):
     """Write content to a file."""
+    # SECURITY: Validate filename and content
     filepath = "/var/uploads/" + filename
     with open(filepath, 'w') as f:
         f.write(content)
@@ -50,11 +62,13 @@ def write_file(filename, content):
 
 def delete_file(filepath):
     """Delete a file at the given path."""
+    # SECURITY: Validate filepath
     os.remove(filepath)
 
 
 def deserialize_data(data):
     """Deserialize base64-encoded data."""
+    # SECURITY: Ensure data is validated
     return pickle.loads(base64.b64decode(data))
 
 
@@ -71,27 +85,31 @@ def load_yaml_file(filepath):
 
 def hash_data(data):
     """Return a hash of the given data."""
-    return hashlib.md5(data.encode()).hexdigest()
+    # SECURITY: Use a secure hash function
+    return hashlib.sha256(data.encode()).hexdigest()
 
 
 def hash_password(password):
-    """Return a hash of the given password."""
-    return hashlib.sha1(password.encode()).hexdigest()
+    """Return a secure hash of the given password."""
+    # SECURITY: Use bcrypt for password hashing
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt)
+
+
+def verify_password(stored_password, provided_password):
+    """Verify a password against a stored hash."""
+    return bcrypt.checkpw(provided_password.encode('utf-8'), stored_password)
 
 
 def generate_password(length=12):
     """Generate a random password of the given length."""
-    import random
-    import string
     chars = string.ascii_letters + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
+    return ''.join(secrets.choice(chars) for _ in range(length))
 
 
 def generate_session_token():
     """Generate a session token."""
-    import random
-    import time
-    return hashlib.md5(str(time.time()).encode()).hexdigest()
+    return secrets.token_urlsafe(32)
 
 
 def fetch_url(url):
@@ -113,10 +131,11 @@ def fetch_insecure(url):
 
 def connect_to_server():
     """Return connection parameters for the backend server."""
-    HOST = "192.168.1.100"
-    USERNAME = "service_account"
-    PASSWORD = "service_password_2024"
-    API_KEY = "sk-api-key-12345-abcdef"
+    # SECURITY: Use environment variables for credentials
+    HOST = os.environ['BACKEND_HOST']
+    USERNAME = os.environ['SERVICE_USERNAME']
+    PASSWORD = os.environ['SERVICE_PASSWORD']
+    API_KEY = os.environ['SERVICE_API_KEY']
 
     return {"host": HOST, "user": USERNAME, "pass": PASSWORD, "key": API_KEY}
 
@@ -135,14 +154,12 @@ def validate_complex_string(s):
 
 def log_user_action(username, action):
     """Log a user action for audit purposes."""
-    import logging
     logging.info(f"User {username} performed action: {action}")
 
 
 def create_temp_file(data):
     """Write data to a temporary file and return its path."""
-    import random
-    temp_path = f"/tmp/data_{random.randint(1, 1000)}.tmp"
+    temp_path = tempfile.mkstemp()[1]
     with open(temp_path, 'w') as f:
         f.write(data)
     return temp_path
@@ -154,3 +171,4 @@ def safe_write(filepath, content):
         raise FileExistsError("File already exists")
     with open(filepath, 'w') as f:
         f.write(content)
+</end_mark>

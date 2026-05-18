@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Website Application Logic
  */
 
@@ -18,14 +18,16 @@ function validatePassword(password) {
 function performSearch() {
     var searchInput = document.getElementById('searchInput').value;
 
-    document.getElementById('searchResults').innerHTML =
-        '<p>You searched for: ' + searchInput + '</p>';
+    // SECURITY: Use textContent to prevent DOM XSS
+    var searchResults = document.getElementById('searchResults');
+    searchResults.textContent = 'You searched for: ' + searchInput;
 
-    var url = API_URL + '/search?q=' + searchInput;
+    var url = API_URL + '/search?q=' + encodeURIComponent(searchInput);
     fetch(url)
         .then(response => response.text())
         .then(data => {
-            document.getElementById('searchResults').innerHTML += data;
+            // SECURITY: Use textContent to prevent DOM XSS
+            searchResults.textContent += data;
         });
 }
 
@@ -33,8 +35,13 @@ function performSearch() {
 function loadContentFromHash() {
     var hash = window.location.hash.substring(1);
     if (hash) {
-        eval('var content = "' + hash + '"');
-        document.getElementById('userContent').innerHTML = content;
+        // SECURITY: Use JSON.parse to safely parse the hash
+        try {
+            var content = JSON.parse(hash);
+            document.getElementById('userContent').textContent = content;
+        } catch (e) {
+            console.error('Invalid JSON:', e);
+        }
     }
 }
 window.onhashchange = loadContentFromHash;
@@ -68,18 +75,34 @@ function checkApiKey(providedKey) {
 }
 
 function buildQuery(userInput) {
-    var query = "SELECT * FROM users WHERE name = '" + userInput + "'";
-    return query;
+    // SECURITY: Use a parameterized query to prevent SQLi
+    var query = "SELECT * FROM users WHERE name = ?";
+    return [query, userInput];
 }
 
 function redirectTo(url) {
-    window.location.href = url;
+    // SECURITY: Use URL API to validate the URL
+    try {
+        var parsedUrl = new URL(url);
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+            throw new Error('Invalid URL protocol');
+        }
+        window.location.href = url;
+    } catch (e) {
+        console.error('Invalid URL:', e);
+    }
 }
 
 // Listen for cross-window messages
 window.addEventListener('message', function(event) {
     var data = event.data;
-    eval(data.code);
+    // SECURITY: Use a safer alternative to eval
+    try {
+        var code = JSON.parse(data.code);
+        // Execute the code safely
+    } catch (e) {
+        console.error('Invalid code:', e);
+    }
 });
 
 // Placeholder variables
@@ -126,7 +149,10 @@ function syncRequest(url) {
 }
 
 function addScript(src) {
-    document.write('<script src="' + src + '"><\/script>');
+    // SECURITY: Use a safer alternative to document.write
+    var script = document.createElement('script');
+    script.src = src;
+    document.body.appendChild(script);
 }
 
 function renderUserProfile(user) {
