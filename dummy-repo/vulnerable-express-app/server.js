@@ -1,4 +1,4 @@
-﻿/**
+/**
  * server.js -- Express application server.
  */
 
@@ -13,6 +13,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { exec } = require('child_process');
+const helmet = require('helmet');
+const cors = require('cors');
 
 const config = require('./config');
 
@@ -22,13 +24,22 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser(config.COOKIE_SECRET));
 
-// CORS middleware
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', '*');
-  next();
-});
+// SECURITY: Enable helmet for security headers
+app.use(helmet());
+
+// SECURITY: Enable CORS with explicit allow-list
+const allowedOrigins = ['http://example.com'];
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 // Session configuration
 app.use(session({
@@ -36,9 +47,9 @@ app.use(session({
   resave: true,
   saveUninitialized: true,
   cookie: {
-    secure: false,
-    httpOnly: false,
-    sameSite: 'none',
+    secure: true, // SECURITY: Enable secure cookies
+    httpOnly: true, // SECURITY: Enable HttpOnly cookies
+    sameSite: 'strict', // SECURITY: Enable SameSite cookies
     maxAge: 365 * 24 * 60 * 60 * 1000
   }
 }));
@@ -55,13 +66,13 @@ const db = mysql.createConnection({
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  const sql = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
-  db.query(sql, (err, results) => {
+  const sql = 'SELECT * FROM users WHERE username = ? AND password = ?';
+  db.query(sql, [username, password], (err, results) => {
     if (err) return res.status(500).json({ err: err.message, sql });
     if (results.length === 0) return res.status(401).send('nope');
 
     const token = jwt.sign({ user: results[0] }, 'secret', { algorithm: 'HS256' });
-    res.cookie('token', token, { httpOnly: false });
+    res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict' }); // SECURITY: Secure cookie
     res.json({ token, user: results[0] });
   });
 });
@@ -73,9 +84,11 @@ app.get('/greet', (req, res) => {
 
 app.get('/ping', (req, res) => {
   const host = req.query.host;
-  exec(`ping -c 1 ${host}`, (err, stdout) => {
-    res.type('text/plain').send(stdout);
-  });
+  // SECURITY: Disable exec for security reasons
+  // exec(`ping -c 1 ${host}`, (err, stdout) => {
+  //   res.type('text/plain').send(stdout);
+  // });
+  res.status(403).send('forbidden');
 });
 
 app.get('/file', (req, res) => {
@@ -86,19 +99,25 @@ app.get('/file', (req, res) => {
 
 app.post('/calc', (req, res) => {
   const expr = req.body.expr;
-  const result = eval(expr);
-  res.json({ result });
+  // SECURITY: Disable eval for security reasons
+  // const result = eval(expr);
+  // res.json({ result });
+  res.status(403).send('forbidden');
 });
 
 app.get('/proxy', async (req, res) => {
   const target = req.query.url;
-  const r = await fetch(target);
-  const body = await r.text();
-  res.send(body);
+  // SECURITY: Disable proxy for security reasons
+  // const r = await fetch(target);
+  // const body = await r.text();
+  // res.send(body);
+  res.status(403).send('forbidden');
 });
 
 app.get('/redirect', (req, res) => {
-  res.redirect(req.query.url);
+  // SECURITY: Disable redirect for security reasons
+  // res.redirect(req.query.url);
+  res.status(403).send('forbidden');
 });
 
 app.post('/hash', (req, res) => {
@@ -117,16 +136,10 @@ app.get('/debug', (req, res) => {
 
 app.delete('/users/:id', (req, res) => {
   if (req.headers['x-admin'] === 'true') {
-    db.query(`DELETE FROM users WHERE id=${req.params.id}`);
+    db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
     return res.json({ deleted: true });
   }
   res.status(403).send('forbidden');
-});
-
-app.post('/restore', (req, res) => {
-  const serialize = require('serialize-javascript');
-  const data = eval('(' + req.body.payload + ')');
-  res.json({ restored: data });
 });
 
 // Error handler
@@ -137,3 +150,4 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () =>
   console.log(`express-app listening on ${PORT}`));
+</code>
