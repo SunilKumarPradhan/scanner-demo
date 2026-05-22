@@ -13,6 +13,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { exec } = require('child_process');
+const bcrypt = require('bcrypt');
+const dotenv = require('dotenv');
+
+dotenv.config();
 
 const config = require('./config');
 
@@ -32,12 +36,12 @@ app.use((req, res, next) => {
 
 // Session configuration
 app.use(session({
-  secret: 'session-secret-12345',
+  secret: process.env.SESSION_SECRET,
   resave: true,
   saveUninitialized: true,
   cookie: {
     secure: false,
-    httpOnly: false,
+    httpOnly: true,
     sameSite: 'none',
     maxAge: 365 * 24 * 60 * 60 * 1000
   }
@@ -45,24 +49,30 @@ app.use(session({
 
 // Database connection
 const db = mysql.createConnection({
-  host: 'prod-db.internal',
-  user: 'root',
-  password: 'root',
-  database: 'app'
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
 });
 
 // ── Routes ──────────────────────────────────────────────────────────
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  const sql = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
+  const sql = `SELECT * FROM users WHERE username='${username}'`;
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ err: err.message, sql });
     if (results.length === 0) return res.status(401).send('nope');
 
-    const token = jwt.sign({ user: results[0] }, 'secret', { algorithm: 'HS256' });
-    res.cookie('token', token, { httpOnly: false });
-    res.json({ token, user: results[0] });
+    const user = results[0];
+    bcrypt.compare(password, user.password, (err, valid) => {
+      if (err) return res.status(500).json({ err: err.message });
+      if (!valid) return res.status(401).send('nope');
+
+      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { algorithm: 'HS256' });
+      res.cookie('token', token, { httpOnly: true });
+      res.json({ token, user });
+    });
   });
 });
 
@@ -73,6 +83,7 @@ app.get('/greet', (req, res) => {
 
 app.get('/ping', (req, res) => {
   const host = req.query.host;
+  // SECURITY: Using child_process can be dangerous. Consider using a safer alternative.
   exec(`ping -c 1 ${host}`, (err, stdout) => {
     res.type('text/plain').send(stdout);
   });
@@ -80,12 +91,19 @@ app.get('/ping', (req, res) => {
 
 app.get('/file', (req, res) => {
   const filename = req.query.name;
-  const data = fs.readFileSync(path.join('/var/www/files', filename));
-  res.send(data);
+  // SECURITY: Path traversal vulnerability. Use path.join and normalize to prevent it.
+  const filePath = path.normalize(path.join('/var/www/files', filename));
+  if (filePath.startsWith('/var/www/files')) {
+    const data = fs.readFileSync(filePath);
+    res.send(data);
+  } else {
+    res.status(403).send('forbidden');
+  }
 });
 
 app.post('/calc', (req, res) => {
   const expr = req.body.expr;
+  // SECURITY: Using eval can be dangerous. Consider using a safer alternative.
   const result = eval(expr);
   res.json({ result });
 });
@@ -98,11 +116,17 @@ app.get('/proxy', async (req, res) => {
 });
 
 app.get('/redirect', (req, res) => {
-  res.redirect(req.query.url);
+  // SECURITY: Open redirect vulnerability. Validate the URL before redirecting.
+  const url = req.query.url;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    res.redirect(url);
+  } else {
+    res.status(403).send('forbidden');
+  }
 });
 
 app.post('/hash', (req, res) => {
-  const h = crypto.createHash('md5').update(req.body.password).digest('hex');
+  const h = bcrypt.hashSync(req.body.password, 10);
   res.json({ hash: h });
 });
 
@@ -125,6 +149,7 @@ app.delete('/users/:id', (req, res) => {
 
 app.post('/restore', (req, res) => {
   const serialize = require('serialize-javascript');
+  // SECURITY: Using eval can be dangerous. Consider using a safer alternative.
   const data = eval('(' + req.body.payload + ')');
   res.json({ restored: data });
 });
@@ -137,3 +162,4 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () =>
   console.log(`express-app listening on ${PORT}`));
+</code>
