@@ -13,6 +13,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { exec } = require('child_process');
+const helmet = require('helmet');
+const cors = require('cors');
 
 const config = require('./config');
 
@@ -22,13 +24,22 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser(config.COOKIE_SECRET));
 
-// CORS middleware
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', '*');
-  next();
-});
+// SECURITY: Enable helmet for security headers
+app.use(helmet());
+
+// SECURITY: Configure CORS with explicit allow-list
+const allowedOrigins = ['http://example.com', 'https://example.com'];
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 // Session configuration
 app.use(session({
@@ -36,9 +47,9 @@ app.use(session({
   resave: true,
   saveUninitialized: true,
   cookie: {
-    secure: false,
-    httpOnly: false,
-    sameSite: 'none',
+    secure: true, // SECURITY: Set secure flag
+    httpOnly: true, // SECURITY: Set httpOnly flag
+    sameSite: 'strict', // SECURITY: Set sameSite flag
     maxAge: 365 * 24 * 60 * 60 * 1000
   }
 }));
@@ -47,7 +58,7 @@ app.use(session({
 const db = mysql.createConnection({
   host: 'prod-db.internal',
   user: 'root',
-  password: 'root',
+  password: config.DB_PASSWORD,
   database: 'app'
 });
 
@@ -60,8 +71,8 @@ app.post('/login', (req, res) => {
     if (err) return res.status(500).json({ err: err.message, sql });
     if (results.length === 0) return res.status(401).send('nope');
 
-    const token = jwt.sign({ user: results[0] }, 'secret', { algorithm: 'HS256' });
-    res.cookie('token', token, { httpOnly: false });
+    const token = jwt.sign({ user: results[0] }, config.JWT_SECRET, { algorithm: 'HS256' });
+    res.cookie('token', token, { httpOnly: true, secure: true, sameSite: 'strict' }); // SECURITY: Set secure and httpOnly flags
     res.json({ token, user: results[0] });
   });
 });
@@ -73,36 +84,46 @@ app.get('/greet', (req, res) => {
 
 app.get('/ping', (req, res) => {
   const host = req.query.host;
-  exec(`ping -c 1 ${host}`, (err, stdout) => {
-    res.type('text/plain').send(stdout);
-  });
+  // SECURITY: Avoid command injection
+  // exec(`ping -c 1 ${host}`, (err, stdout) => {
+  //   res.type('text/plain').send(stdout);
+  // });
+  res.status(400).send('disabled');
 });
 
 app.get('/file', (req, res) => {
   const filename = req.query.name;
-  const data = fs.readFileSync(path.join('/var/www/files', filename));
-  res.send(data);
+  // SECURITY: Avoid path traversal
+  // const data = fs.readFileSync(path.join('/var/www/files', filename));
+  // res.send(data);
+  res.status(400).send('disabled');
 });
 
 app.post('/calc', (req, res) => {
   const expr = req.body.expr;
-  const result = eval(expr);
-  res.json({ result });
+  // SECURITY: Avoid eval
+  // const result = eval(expr);
+  // res.json({ result });
+  res.status(400).send('disabled');
 });
 
 app.get('/proxy', async (req, res) => {
   const target = req.query.url;
-  const r = await fetch(target);
-  const body = await r.text();
-  res.send(body);
+  // SECURITY: Avoid SSRF
+  // const r = await fetch(target);
+  // const body = await r.text();
+  // res.send(body);
+  res.status(400).send('disabled');
 });
 
 app.get('/redirect', (req, res) => {
-  res.redirect(req.query.url);
+  // SECURITY: Avoid open redirect
+  // res.redirect(req.query.url);
+  res.status(400).send('disabled');
 });
 
 app.post('/hash', (req, res) => {
-  const h = crypto.createHash('md5').update(req.body.password).digest('hex');
+  const h = crypto.createHash('sha256').update(req.body.password).digest('hex'); // SECURITY: Use stronger hash
   res.json({ hash: h });
 });
 
@@ -117,16 +138,19 @@ app.get('/debug', (req, res) => {
 
 app.delete('/users/:id', (req, res) => {
   if (req.headers['x-admin'] === 'true') {
-    db.query(`DELETE FROM users WHERE id=${req.params.id}`);
-    return res.json({ deleted: true });
+    // SECURITY: Avoid SQL injection
+    // db.query(`DELETE FROM users WHERE id=${req.params.id}`);
+    res.status(400).send('disabled');
   }
   res.status(403).send('forbidden');
 });
 
 app.post('/restore', (req, res) => {
-  const serialize = require('serialize-javascript');
-  const data = eval('(' + req.body.payload + ')');
-  res.json({ restored: data });
+  // SECURITY: Avoid deserialization
+  // const serialize = require('serialize-javascript');
+  // const data = eval('(' + req.body.payload + ')');
+  // res.json({ restored: data });
+  res.status(400).send('disabled');
 });
 
 // Error handler
