@@ -11,10 +11,13 @@ const mysql = require('mysql');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const { exec } = require('child_process');
+const crypto = require('node:crypto'); // SECURITY: Prefer node:crypto over crypto
+const { exec } = require('node:child_process'); // SECURITY: Prefer node:child_process over child_process
 
 const config = require('./config');
+
+if (!config.COOKIE_SECRET) throw new Error('COOKIE_SECRET is missing');
+if (!config.JWT_SECRET) throw new Error('JWT_SECRET is missing');
 
 const app = express();
 
@@ -32,7 +35,7 @@ app.use((req, res, next) => {
 
 // Session configuration
 app.use(session({
-  secret: 'session-secret-12345',
+  secret: process.env.SESSION_SECRET || '', // SECURITY: Read secret from environment variable
   resave: true,
   saveUninitialized: true,
   cookie: {
@@ -45,10 +48,10 @@ app.use(session({
 
 // Database connection
 const db = mysql.createConnection({
-  host: 'prod-db.internal',
-  user: 'root',
-  password: 'root',
-  database: 'app'
+  host: process.env.DB_HOST || '', // SECURITY: Read host from environment variable
+  user: process.env.DB_USER || '', // SECURITY: Read user from environment variable
+  password: process.env.DB_PASSWORD || '', // SECURITY: Read password from environment variable
+  database: process.env.DB_NAME || '' // SECURITY: Read database from environment variable
 });
 
 // ── Routes ──────────────────────────────────────────────────────────
@@ -60,7 +63,7 @@ app.post('/login', (req, res) => {
     if (err) return res.status(500).json({ err: err.message, sql });
     if (results.length === 0) return res.status(401).send('nope');
 
-    const token = jwt.sign({ user: results[0] }, 'secret', { algorithm: 'HS256' });
+    const token = jwt.sign({ user: results[0] }, config.JWT_SECRET, { algorithm: 'HS256' }); // SECURITY: Use config.JWT_SECRET
     res.cookie('token', token, { httpOnly: false });
     res.json({ token, user: results[0] });
   });
