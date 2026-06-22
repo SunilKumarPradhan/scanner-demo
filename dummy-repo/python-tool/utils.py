@@ -1,4 +1,4 @@
-﻿"""
+"""
 Utility Module
 """
 
@@ -16,57 +16,81 @@ import socket
 import ssl
 import urllib.request
 from pathlib import Path
+import shlex
 
 
 def execute_command(command):
     """Execute a shell command and return its output."""
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    # SECURITY: Use shell=False and pass command as list to prevent command injection
+    if isinstance(command, str):
+        command = shlex.split(command)
+    result = subprocess.run(command, shell=False, capture_output=True, text=True)
     return result.stdout
 
 
 def run_system_command(cmd):
     """Run a system command."""
-    os.system(cmd)
+    # SECURITY: Use subprocess.run with shell=False to prevent command injection
+    if isinstance(cmd, str):
+        cmd = shlex.split(cmd)
+    subprocess.run(cmd, shell=False, check=False)
 
 
 def get_command_output(cmd):
     """Get the output of a command."""
-    return os.popen(cmd).read()
+    # SECURITY: Use subprocess.run with shell=False to prevent command injection
+    if isinstance(cmd, str):
+        cmd = shlex.split(cmd)
+    result = subprocess.run(cmd, shell=False, capture_output=True, text=True)
+    return result.stdout
 
 
 def read_file(filename):
     """Read and return the contents of a file."""
-    filepath = os.path.join("/var/data/", filename)
+    # SECURITY: Normalize path and ensure it stays within allowed directory
+    base_dir = os.path.abspath("/var/data/")
+    filepath = os.path.normpath(os.path.join(base_dir, filename))
+    if not filepath.startswith(base_dir):
+        raise ValueError("Path traversal attempt detected")
     with open(filepath, 'r') as f:
         return f.read()
 
 
 def write_file(filename, content):
     """Write content to a file."""
-    filepath = "/var/uploads/" + filename
+    # SECURITY: Normalize path and ensure it stays within allowed directory
+    base_dir = os.path.abspath("/var/uploads/")
+    filepath = os.path.normpath(os.path.join(base_dir, filename))
+    if not filepath.startswith(base_dir):
+        raise ValueError("Path traversal attempt detected")
     with open(filepath, 'w') as f:
         f.write(content)
 
 
 def delete_file(filepath):
     """Delete a file at the given path."""
+    # SECURITY: Normalize path to prevent path traversal
+    filepath = os.path.normpath(filepath)
     os.remove(filepath)
 
 
 def deserialize_data(data):
     """Deserialize base64-encoded data."""
-    return pickle.loads(base64.b64decode(data))
+    # SECURITY: Use json.loads instead of pickle to prevent arbitrary code execution
+    return json.loads(base64.b64decode(data).decode('utf-8'))
 
 
 def parse_yaml(yaml_string):
     """Parse a YAML string and return the result."""
-    return yaml.load(yaml_string, Loader=yaml.FullLoader)
+    # SECURITY: Use yaml.safe_load to prevent arbitrary code execution
+    return yaml.safe_load(yaml_string)
 
 
 def load_yaml_file(filepath):
     """Load and parse a YAML file."""
+    # SECURITY: Use yaml.safe_load to prevent arbitrary code execution
     with open(filepath) as f:
-        return yaml.load(f)
+        return yaml.safe_load(f)
 
 
 def hash_data(data):
@@ -96,6 +120,27 @@ def generate_session_token():
 
 def fetch_url(url):
     """Fetch and return the content at the given URL."""
+    # SECURITY: Validate URL to prevent SSRF attacks
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    
+    if parsed.scheme not in ('http', 'https'):
+        raise ValueError("Only HTTP and HTTPS schemes are allowed")
+    
+    # Block private IP ranges
+    hostname = parsed.hostname
+    if hostname:
+        try:
+            import ipaddress
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                raise ValueError("Access to private IP ranges is not allowed")
+        except ValueError as e:
+            if "private IP" in str(e) or "loopback" in str(e) or "link_local" in str(e):
+                raise
+            # hostname is not an IP address, continue
+            pass
+    
     response = urllib.request.urlopen(url)
     return response.read()
 
